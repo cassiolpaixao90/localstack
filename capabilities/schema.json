@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:localstack-fork:capabilities:v1",
+  "title": "LocalStack AWS capability inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "model_catalog_sha256",
+    "inventory_sha256",
+    "source",
+    "classification",
+    "summary",
+    "cloudformation",
+    "services"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "model_catalog_sha256": {"$ref": "#/$defs/hash"},
+    "inventory_sha256": {"$ref": "#/$defs/hash"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "version", "license", "uri"],
+      "properties": {
+        "type": {"const": "botocore-service-model"},
+        "version": {"type": "string", "minLength": 1},
+        "license": {"type": "string", "minLength": 1},
+        "uri": {"type": "string", "format": "uri"}
+      }
+    },
+    "classification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "native_and_parity_require_runtime_evidence", "statuses"],
+      "properties": {
+        "method": {"const": "conservative-static-analysis"},
+        "native_and_parity_require_runtime_evidence": {"const": true},
+        "statuses": {
+          "type": "array",
+          "prefixItems": [
+            {"const": "missing"},
+            {"const": "scaffold"},
+            {"const": "fallback"},
+            {"const": "partial"},
+            {"const": "native"},
+            {"const": "parity-pass"}
+          ],
+          "items": false
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "services",
+        "operations",
+        "generated_interfaces",
+        "services_with_providers",
+        "cloudformation_resources",
+        "by_status"
+      ],
+      "properties": {
+        "services": {"$ref": "#/$defs/nonNegativeInteger"},
+        "operations": {"$ref": "#/$defs/nonNegativeInteger"},
+        "generated_interfaces": {"$ref": "#/$defs/nonNegativeInteger"},
+        "services_with_providers": {"$ref": "#/$defs/nonNegativeInteger"},
+        "cloudformation_resources": {"$ref": "#/$defs/nonNegativeInteger"},
+        "by_status": {"$ref": "#/$defs/statusCounts"}
+      }
+    },
+    "cloudformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resources"],
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/cloudformationResource"}
+        }
+      }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/service"}
+    }
+  },
+  "$defs": {
+    "hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "statusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "scaffold", "fallback", "partial", "native", "parity-pass"],
+      "properties": {
+        "missing": {"$ref": "#/$defs/nonNegativeInteger"},
+        "scaffold": {"$ref": "#/$defs/nonNegativeInteger"},
+        "fallback": {"$ref": "#/$defs/nonNegativeInteger"},
+        "partial": {"$ref": "#/$defs/nonNegativeInteger"},
+        "native": {"$ref": "#/$defs/nonNegativeInteger"},
+        "parity-pass": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "api_version",
+        "protocol",
+        "model_sha256",
+        "generated_interface",
+        "providers",
+        "default_provider",
+        "cloudformation_resources",
+        "operation_statuses",
+        "implementations"
+      ],
+      "properties": {
+        "api_version": {"type": "string"},
+        "protocol": {"type": "string"},
+        "model_sha256": {"$ref": "#/$defs/hash"},
+        "generated_interface": {"$ref": "#/$defs/nullableString"},
+        "providers": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/provider"}
+        },
+        "default_provider": {"$ref": "#/$defs/nullableString"},
+        "cloudformation_resources": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "operation_statuses": {"$ref": "#/$defs/statusGroups"},
+        "implementations": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/implementation"}
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "module", "class", "fallback", "declared_handlers"],
+      "properties": {
+        "name": {"type": "string"},
+        "module": {"$ref": "#/$defs/nullableString"},
+        "class": {"$ref": "#/$defs/nullableString"},
+        "fallback": {"$ref": "#/$defs/nullableString"},
+        "declared_handlers": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "statusGroups": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["missing", "scaffold", "fallback", "partial", "native", "parity-pass"],
+      "properties": {
+        "missing": {"$ref": "#/$defs/operationList"},
+        "scaffold": {"$ref": "#/$defs/operationList"},
+        "fallback": {"$ref": "#/$defs/operationList"},
+        "partial": {"$ref": "#/$defs/operationList"},
+        "native": {"$ref": "#/$defs/operationList"},
+        "parity-pass": {"$ref": "#/$defs/operationList"}
+      }
+    },
+    "operationList": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "reasons", "validation", "performance"],
+      "properties": {
+        "origin": {
+          "type": "string",
+          "pattern": "^(none|generated-stub|native-candidate|composite-candidate|delegated:[a-z0-9_-]+)$"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {"type": "string"},
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "provider": {"type": "string"},
+        "fallback": {"$ref": "#/$defs/nullableString"},
+        "handler": {"$ref": "#/$defs/handler"},
+        "validation": {"$ref": "#/$defs/validation"},
+        "performance": {"$ref": "#/$defs/performance"}
+      }
+    },
+    "handler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "class",
+        "function",
+        "source",
+        "line",
+        "unconditional_notimplemented",
+        "conditional_notimplemented",
+        "direct_fallback"
+      ],
+      "properties": {
+        "module": {"type": "string"},
+        "class": {"type": "string"},
+        "function": {"type": "string"},
+        "source": {"type": "string"},
+        "line": {"type": "integer", "minimum": 1},
+        "unconditional_notimplemented": {"type": "boolean"},
+        "conditional_notimplemented": {"type": "boolean"},
+        "direct_fallback": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "evidence"],
+      "properties": {
+        "status": {"enum": ["unverified", "local-pass", "parity-pass", "parity-fail"]},
+        "evidence": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profiles"],
+      "properties": {
+        "profiles": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "cloudformationResource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source_service", "source"],
+      "properties": {
+        "type": {"type": "string", "pattern": "^AWS::"},
+        "source_service": {"type": "string"},
+        "source": {"type": "string"}
+      }
+    }
+  }
+}
