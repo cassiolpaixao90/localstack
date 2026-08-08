@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "sha256:f6ce19e06915c62d44a687c7dbda1aa8158aa0dec37f5b61c46a1e1ffc3f265f",
+  "scope": "planning-baseline",
+  "sources": [
+    {
+      "id": "aws-cdk-bootstrap",
+      "uri": "https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-env.html",
+      "retrieved_at": "2026-08-08",
+      "claim": "bootstrap template version history"
+    },
+    {
+      "id": "aws-cdk-cli-compatibility",
+      "uri": "https://github.com/aws/aws-cdk-cli/blob/main/COMPATIBILITY.md",
+      "retrieved_at": "2026-08-08",
+      "claim": "CLI and Cloud Assembly compatibility"
+    },
+    {
+      "id": "aws-cdk-languages",
+      "uri": "https://docs.aws.amazon.com/cdk/v2/guide/languages.html",
+      "retrieved_at": "2026-08-08",
+      "claim": "official language bindings"
+    },
+    {
+      "id": "aws-cdk-prerequisites",
+      "uri": "https://docs.aws.amazon.com/cdk/v2/guide/prerequisites.html",
+      "retrieved_at": "2026-08-08",
+      "claim": "Node and language prerequisites"
+    },
+    {
+      "id": "aws-cdk-versioning",
+      "uri": "https://docs.aws.amazon.com/cdk/v2/guide/versioning.html",
+      "retrieved_at": "2026-08-08",
+      "claim": "binding stability and CLI/library decoupling"
+    },
+    {
+      "id": "localstack-cdk",
+      "uri": "https://docs.localstack.cloud/aws/connecting/infrastructure-as-code/aws-cdk/",
+      "retrieved_at": "2026-08-08",
+      "claim": "thin wrapper, endpoint configuration, and documented limitations"
+    },
+    {
+      "id": "localstack-lstk",
+      "uri": "https://docs.localstack.cloud/aws/developer-tools/running-localstack/lstk/",
+      "retrieved_at": "2026-08-08",
+      "claim": "standard CDK endpoint mode and minimum CLI version"
+    }
+  ],
+  "policy": {
+    "claim_granularity": "exact-toolchain-language-scenario",
+    "language_neutral_boundary": "cloud-assembly-and-aws-apis",
+    "new_stable_bindings": "automatically-required",
+    "aws_validation_max_age_days": 90,
+    "required_platforms": ["linux-amd64", "linux-arm64"]
+  },
+  "languages": [
+    {"id": "csharp", "init_value": "csharp", "official_stability": "stable", "support_gate": "required", "ecosystem": "nuget", "coordinate": "Amazon.CDK.Lib"},
+    {"id": "go", "init_value": "go", "official_stability": "stable", "support_gate": "required", "ecosystem": "go", "coordinate": "github.com/aws/aws-cdk-go/awscdk/v2"},
+    {"id": "java", "init_value": "java", "official_stability": "stable", "support_gate": "required", "ecosystem": "maven", "coordinate": "software.amazon.awscdk:aws-cdk-lib"},
+    {"id": "javascript", "init_value": "javascript", "official_stability": "stable", "support_gate": "required", "ecosystem": "npm", "coordinate": "aws-cdk-lib"},
+    {"id": "python", "init_value": "python", "official_stability": "stable", "support_gate": "required", "ecosystem": "pypi", "coordinate": "aws-cdk-lib"},
+    {"id": "typescript", "init_value": "typescript", "official_stability": "stable", "support_gate": "required", "ecosystem": "npm", "coordinate": "aws-cdk-lib"}
+  ],
+  "toolchain": {
+    "node": {"minimum": "22.0.0", "pinned": null, "tested": []},
+    "cdk_cli": {"minimum": null, "pinned": null, "tested": []},
+    "construct_library": {"minimum": "2.88.0", "pinned": "2.241.0", "tested": []},
+    "cloud_assembly": {"minimum": null, "pinned": "52.2.0", "tested": []},
+    "bootstrap": {
+      "latest_official_version": 32,
+      "observed_templates": [
+        {"version": 10, "path": "tests/aws/templates/cdk_bootstrap_v10.yaml", "sha256": "sha256:d3ef03ce98a15e9291402849986c5c4ab007c6e94264c976cf31c5dba67865d3"},
+        {"version": 11, "path": "tests/aws/templates/cdk_bootstrap_v11.yaml", "sha256": "sha256:72c3f1736130944fd3a133e8a7dcf47c55280880b1bdc0d0e6b50704cadac880"},
+        {"version": 12, "path": "tests/aws/templates/cdk_bootstrap_v12.yaml", "sha256": "sha256:50480eb36d4a2f6f08344f7cdddb005cffc216f26a483d94bd56900d7c2dcef0"},
+        {"version": 20, "path": "tests/aws/templates/cdk_bootstrap.yml", "sha256": "sha256:f6838a92b1632629bbb7244b352ca8723109ecf8e354dc8e2025103afb291b8a"},
+        {"version": 28, "path": "tests/aws/templates/cdk_bootstrap_v28.yaml", "sha256": "sha256:d84e26fcd602ef1b58a60a71e7f47a4cc9a6fa3f62e7c88182905cfb080fab4e"}
+      ]
+    }
+  },
+  "launcher": {
+    "mode": "thin-supervisor",
+    "executable": "standard-cdk",
+    "minimum_cli_for_endpoint_mode": "2.177.0",
+    "environment": ["AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3", "AWS_REGION", "CDK_DEFAULT_ACCOUNT", "CDK_DEFAULT_REGION"],
+    "safety": ["bounded-output", "fail-closed-no-aws-fallback", "process-tree-timeout", "reject-public-aws-endpoints", "strip-parent-aws-credentials"]
+  },
+  "current_evidence": {
+    "construct_language": "python",
+    "real_cli_exercised": false,
+    "cloud_assembly_produced": false,
+    "freshness": "stale",
+    "critical_snapshot_exclusions": true,
+    "local_paths": [
+      "localstack-core/localstack/testing/scenario/provisioning.py",
+      "requirements-test.txt",
+      "tests/aws/services/cloudformation/resources/test_cdk.py",
+      "tests/aws/services/cloudformation/resources/test_cdk.validation.json"
+    ]
+  },
+  "capabilities": [
+    {"id": "bootstrap", "status": "template-only", "languages": [], "dependencies": ["cloudformation", "ecr", "iam", "kms", "s3", "ssm", "sts"], "evidence": ["tests/aws/services/cloudformation/resources/test_cdk.py"], "gaps": ["bootstrap-cli-not-run", "validation-stale"]},
+    {"id": "context-lookups", "status": "untested", "languages": [], "dependencies": ["ec2", "route53", "ssm", "sts"], "evidence": [], "gaps": ["real-cli-not-run"]},
+    {"id": "custom-resources", "status": "untested", "languages": [], "dependencies": ["lambda", "sns"], "evidence": [], "gaps": ["transparent-endpoint-injection-not-validated"]},
+    {"id": "deploy", "status": "api-simulated", "languages": ["python"], "dependencies": ["cloudformation"], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["real-cli-not-run"]},
+    {"id": "destroy", "status": "api-simulated", "languages": ["python"], "dependencies": ["cloudformation"], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["real-cli-not-run"]},
+    {"id": "diff", "status": "untested", "languages": [], "dependencies": ["cloudformation"], "evidence": [], "gaps": ["real-cli-not-run"]},
+    {"id": "docker-assets", "status": "blocked", "languages": [], "dependencies": ["cloudformation", "ecr", "iam", "ssm", "sts"], "evidence": ["localstack-core/localstack/testing/scenario/cdk_lambda_helper.py"], "gaps": ["bootstrapless-synthesizer", "images-loaded-manually"]},
+    {"id": "file-assets", "status": "blocked", "languages": [], "dependencies": ["cloudformation", "iam", "s3", "ssm", "sts"], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["bootstrapless-synthesizer", "assets-loaded-manually"]},
+    {"id": "hotswap", "status": "untested", "languages": [], "dependencies": ["cloudformation", "lambda"], "evidence": [], "gaps": ["real-cli-not-run"]},
+    {"id": "init", "status": "untested", "languages": [], "dependencies": [], "evidence": [], "gaps": ["real-cli-not-run"]},
+    {"id": "list", "status": "untested", "languages": [], "dependencies": [], "evidence": [], "gaps": ["real-cli-not-run"]},
+    {"id": "nested-stacks", "status": "untested", "languages": [], "dependencies": ["cloudformation", "s3"], "evidence": [], "gaps": ["real-cli-not-run"]},
+    {"id": "no-op", "status": "api-simulated", "languages": ["python"], "dependencies": ["cloudformation"], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["waiter-error-is-treated-as-no-op"]},
+    {"id": "synth", "status": "template-api-only", "languages": ["python"], "dependencies": [], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["cloud-assembly-not-produced", "real-cli-not-run"]},
+    {"id": "transforms", "status": "untested", "languages": [], "dependencies": ["cloudformation", "lambda", "s3"], "evidence": [], "gaps": ["no-transform-template-in-current-cdk-corpus"]},
+    {"id": "update", "status": "api-simulated", "languages": ["python"], "dependencies": ["cloudformation"], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["no-explicit-update-scenario", "real-cli-not-run"]}
+  ]
+}

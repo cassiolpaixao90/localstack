@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:localstack-fork:cdk-compatibility:v1",
+  "title": "AWS CDK compatibility planning baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_sha256",
+    "scope",
+    "sources",
+    "policy",
+    "languages",
+    "toolchain",
+    "launcher",
+    "current_evidence",
+    "capabilities"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "manifest_sha256": {"$ref": "#/$defs/hash"},
+    "scope": {"const": "planning-baseline"},
+    "sources": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/source"}},
+    "policy": {"$ref": "#/$defs/policy"},
+    "languages": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/language"}
+    },
+    "toolchain": {"$ref": "#/$defs/toolchain"},
+    "launcher": {"$ref": "#/$defs/launcher"},
+    "current_evidence": {"$ref": "#/$defs/currentEvidence"},
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/capability"}
+    }
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "languageId": {"enum": ["typescript", "javascript", "python", "java", "csharp", "go"]},
+    "stringArray": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "uri", "retrieved_at", "claim"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "uri": {"type": "string", "format": "uri"},
+        "retrieved_at": {"type": "string", "format": "date"},
+        "claim": {"type": "string", "minLength": 1}
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_granularity",
+        "language_neutral_boundary",
+        "new_stable_bindings",
+        "aws_validation_max_age_days",
+        "required_platforms"
+      ],
+      "properties": {
+        "claim_granularity": {"const": "exact-toolchain-language-scenario"},
+        "language_neutral_boundary": {"const": "cloud-assembly-and-aws-apis"},
+        "new_stable_bindings": {"const": "automatically-required"},
+        "aws_validation_max_age_days": {"type": "integer", "minimum": 1},
+        "required_platforms": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "init_value", "official_stability", "support_gate", "ecosystem", "coordinate"],
+      "properties": {
+        "id": {"$ref": "#/$defs/languageId"},
+        "init_value": {"type": "string", "minLength": 1},
+        "official_stability": {"const": "stable"},
+        "support_gate": {"const": "required"},
+        "ecosystem": {"type": "string", "minLength": 1},
+        "coordinate": {"type": "string", "minLength": 1}
+      }
+    },
+    "versionLane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum", "pinned", "tested"],
+      "properties": {
+        "minimum": {"type": ["string", "null"]},
+        "pinned": {"type": ["string", "null"]},
+        "tested": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "bootstrapTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "path", "sha256"],
+      "properties": {
+        "version": {"type": "integer", "minimum": 1},
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/hash"}
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node", "cdk_cli", "construct_library", "cloud_assembly", "bootstrap"],
+      "properties": {
+        "node": {"$ref": "#/$defs/versionLane"},
+        "cdk_cli": {"$ref": "#/$defs/versionLane"},
+        "construct_library": {"$ref": "#/$defs/versionLane"},
+        "cloud_assembly": {"$ref": "#/$defs/versionLane"},
+        "bootstrap": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["latest_official_version", "observed_templates"],
+          "properties": {
+            "latest_official_version": {"type": "integer", "minimum": 1},
+            "observed_templates": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/bootstrapTemplate"}}
+          }
+        }
+      }
+    },
+    "launcher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "executable", "minimum_cli_for_endpoint_mode", "environment", "safety"],
+      "properties": {
+        "mode": {"const": "thin-supervisor"},
+        "executable": {"const": "standard-cdk"},
+        "minimum_cli_for_endpoint_mode": {"type": "string", "minLength": 1},
+        "environment": {"$ref": "#/$defs/stringArray"},
+        "safety": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "currentEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "construct_language",
+        "real_cli_exercised",
+        "cloud_assembly_produced",
+        "freshness",
+        "critical_snapshot_exclusions",
+        "local_paths"
+      ],
+      "properties": {
+        "construct_language": {"const": "python"},
+        "real_cli_exercised": {"const": false},
+        "cloud_assembly_produced": {"const": false},
+        "freshness": {"enum": ["missing", "stale", "fresh"]},
+        "critical_snapshot_exclusions": {"type": "boolean"},
+        "local_paths": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "languages", "dependencies", "evidence", "gaps"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "status": {
+          "enum": ["untested", "template-only", "template-api-only", "api-simulated", "blocked", "cli-pass", "parity-pass"]
+        },
+        "languages": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/languageId"},
+          "uniqueItems": true
+        },
+        "dependencies": {"$ref": "#/$defs/stringArray"},
+        "evidence": {"$ref": "#/$defs/stringArray"},
+        "gaps": {"$ref": "#/$defs/stringArray"}
+      }
+    }
+  }
+}

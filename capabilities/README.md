@@ -20,6 +20,9 @@ Artifacts:
 
 - `catalog.lock.json`: pinned Botocore denominator and model digests;
 - `generated/capabilities.json`: per-service and per-operation static inventory;
+- `cdk/compatibility.json`: content-addressed CDK language, toolchain, and
+  scenario planning baseline;
+- `cdk/compatibility.schema.json`: closed contract for the CDK baseline;
 - `report.md`: human-readable summary derived from the JSON inventory.
 
 Do not edit generated files manually. Static analysis never promotes an operation
@@ -59,6 +62,13 @@ scope, provider selection, a fresh AWS validation, and zero critical snapshot
 skips. Changing input order or repeating the same row does not change the
 semantic digest, while the evidence ID still binds the exact files and row
 counts used.
+
+The CDK baseline follows the same conservative rule. It requires every stable
+AWS binding and records current template-only or API-simulated coverage without
+claiming that the real CLI works. Future execution evidence must be attached to
+an exact language, Node, CLI, construct-library, Cloud Assembly, bootstrap,
+platform, and scenario tuple; never replace that matrix with a global
+`cdk_supported` boolean.
 
 The static provider inventory covers the providers declared by this checkout.
 Static classifications use the provider registered as `default`; the JSON also
