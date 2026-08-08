@@ -1,7 +1,7 @@
 # AWS Feature Parity Roadmap
 
-Status: proposed  
-Created: 2026-08-08  
+Status: proposed
+Created: 2026-08-08
 Scope baseline: public archive checkout `8b9a79f05846835cf4dff63ab7eefdde9df83783`
 dated 2026-03-23 and the public AWS/LocalStack catalog available on the creation
 date. `v4.14.0` is a release reference, not a proven equivalent tag for this checkout.
