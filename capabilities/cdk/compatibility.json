@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "manifest_sha256": "sha256:1d541ce326e29f751de38d11fae1bce60a50c2285ca9ce5ae0546c374b5acf45",
+  "manifest_sha256": "sha256:38fe7c0bc0d987c38f1e92bcf983dbcff45a803b56fe5df9308a7c5f85298938",
   "scope": "planning-baseline",
   "sources": [
     {
@@ -8,6 +8,12 @@
       "uri": "https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-env.html",
       "retrieved_at": "2026-08-08",
       "claim": "bootstrap template version history"
+    },
+    {
+      "id": "aws-cdk-bootstrap-v32-template",
+      "uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/lib/api/bootstrap/bootstrap-template.yaml",
+      "retrieved_at": "2026-08-08",
+      "claim": "byte-exact official bootstrap template version 32"
     },
     {
       "id": "aws-cdk-cli-compatibility",
@@ -73,7 +79,8 @@
         {"version": 11, "path": "tests/aws/templates/cdk_bootstrap_v11.yaml", "sha256": "sha256:72c3f1736130944fd3a133e8a7dcf47c55280880b1bdc0d0e6b50704cadac880"},
         {"version": 12, "path": "tests/aws/templates/cdk_bootstrap_v12.yaml", "sha256": "sha256:50480eb36d4a2f6f08344f7cdddb005cffc216f26a483d94bd56900d7c2dcef0"},
         {"version": 20, "path": "tests/aws/templates/cdk_bootstrap.yml", "sha256": "sha256:f6838a92b1632629bbb7244b352ca8723109ecf8e354dc8e2025103afb291b8a"},
-        {"version": 28, "path": "tests/aws/templates/cdk_bootstrap_v28.yaml", "sha256": "sha256:d84e26fcd602ef1b58a60a71e7f47a4cc9a6fa3f62e7c88182905cfb080fab4e"}
+        {"version": 28, "path": "tests/aws/templates/cdk_bootstrap_v28.yaml", "sha256": "sha256:d84e26fcd602ef1b58a60a71e7f47a4cc9a6fa3f62e7c88182905cfb080fab4e"},
+        {"version": 32, "path": "tests/aws/templates/cdk_bootstrap_v32.yaml", "sha256": "sha256:a484ad768d3446874161044d986bec096e201a54037c8ce93ed5a0d215e1dd25", "source_id": "aws-cdk-bootstrap-v32-template", "upstream_revision": "6551740894bf096065331647097c1617e9e4f988", "retrieved_at": "2026-08-08", "byte_exact": true}
       ]
     }
   },

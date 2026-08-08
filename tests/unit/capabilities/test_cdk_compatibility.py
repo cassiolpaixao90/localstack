@@ -2,6 +2,8 @@ import hashlib
 import json
 from pathlib import Path
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).parents[3]
 MANIFEST_PATH = PROJECT_ROOT / "capabilities/cdk/compatibility.json"
 SCHEMA_PATH = PROJECT_ROOT / "capabilities/cdk/compatibility.schema.json"
@@ -116,3 +118,29 @@ def test_cdk_bootstrap_template_digests_are_current():
     for template in manifest["toolchain"]["bootstrap"]["observed_templates"]:
         content = (PROJECT_ROOT / template["path"]).read_bytes()
         assert template["sha256"] == f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+def test_latest_cdk_bootstrap_template_is_byte_exact_and_pinned():
+    manifest = _load(MANIFEST_PATH)
+    sources = {source["id"]: source for source in manifest["sources"]}
+    latest = manifest["toolchain"]["bootstrap"]["observed_templates"][-1]
+
+    assert latest == {
+        "version": 32,
+        "path": "tests/aws/templates/cdk_bootstrap_v32.yaml",
+        "sha256": "sha256:a484ad768d3446874161044d986bec096e201a54037c8ce93ed5a0d215e1dd25",
+        "source_id": "aws-cdk-bootstrap-v32-template",
+        "upstream_revision": "6551740894bf096065331647097c1617e9e4f988",
+        "retrieved_at": "2026-08-08",
+        "byte_exact": True,
+    }
+    assert sources[latest["source_id"]] == {
+        "id": "aws-cdk-bootstrap-v32-template",
+        "uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/lib/api/bootstrap/bootstrap-template.yaml",
+        "retrieved_at": "2026-08-08",
+        "claim": "byte-exact official bootstrap template version 32",
+    }
+
+    template = yaml.safe_load((PROJECT_ROOT / latest["path"]).read_text())
+    assert template["Resources"]["CdkBootstrapVersion"]["Properties"]["Value"] == "32"
+    assert template["Outputs"]["BootstrapVersion"]["Value"] == "32"
