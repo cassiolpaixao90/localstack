@@ -84,6 +84,17 @@ def test_cdk_compatibility_manifest_does_not_overclaim_current_cli_support():
     )
 
 
+def test_cdk_launcher_process_boundary_is_explicit():
+    manifest = _load(MANIFEST_PATH)
+
+    assert manifest["launcher"]["process_supervision"] == {
+        "platform": "posix",
+        "boundary": "process-group",
+        "detached_descendants": "not-contained",
+    }
+    assert "process-tree-timeout" not in manifest["launcher"]["safety"]
+
+
 def test_cdk_compatibility_manifest_digest_and_local_evidence_are_current():
     manifest = _load(MANIFEST_PATH)
     payload = dict(manifest)

@@ -70,6 +70,12 @@ an exact language, Node, CLI, construct-library, Cloud Assembly, bootstrap,
 platform, and scenario tuple; never replace that matrix with a global
 `cdk_supported` boolean.
 
+The launcher treats the standard CDK CLI as trusted code and supervises one
+POSIX process group. It bounds output and runtime but is not a sandbox: a child
+that deliberately starts a detached session is outside this boundary. Stronger
+containment requires a separately validated cgroup v2 or Windows Job Object
+adapter.
+
 The static provider inventory covers the providers declared by this checkout.
 Static classifications use the provider registered as `default`; the JSON also
 lists selectable alternatives without claiming they are active. External plugins

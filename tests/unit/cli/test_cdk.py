@@ -1,9 +1,19 @@
+import json
 import os
+import sys
+import threading
+import time
 from urllib.parse import urlsplit
 
 import pytest
 
-from localstack.cli.cdk import CdkLauncherError, build_cdk_environment, validate_local_endpoint
+from localstack.cli.cdk import (
+    MAX_CDK_OUTPUT_BYTES,
+    CdkLauncherError,
+    build_cdk_environment,
+    launch_cdk,
+    validate_local_endpoint,
+)
 
 
 @pytest.mark.parametrize(
@@ -160,4 +170,161 @@ def test_build_cdk_environment_rejects_invalid_aws_identity(region, account_id):
             endpoint_url="http://localhost:4566",
             region=region,
             account_id=account_id,
+        )
+
+
+def test_launch_cdk_passes_arguments_literally_and_preserves_exit_code(tmp_path):
+    marker = tmp_path / "shell-was-used"
+    arguments = ["with spaces", ";", f"$(touch {marker})", "*.py"]
+    script = "import json,sys; print(json.dumps(sys.argv[1:])); print('err', file=sys.stderr); sys.exit(7)"
+
+    result = launch_cdk(
+        ["-c", script, *arguments],
+        executable=sys.executable,
+        environment={},
+    )
+
+    assert result.returncode == 7
+    assert json.loads(result.stdout) == arguments
+    assert result.stderr == b"err\n"
+    assert not marker.exists()
+    assert result.stdout_truncated is False
+    assert result.stderr_truncated is False
+
+
+def test_launch_cdk_bounds_and_drains_stdout_and_stderr():
+    output_bytes = 2 * 1024 * 1024
+    script = f"import os; os.write(1, b'o' * {output_bytes}); os.write(2, b'e' * {output_bytes})"
+
+    result = launch_cdk(
+        ["-c", script],
+        executable=sys.executable,
+        environment={},
+        max_output_bytes=1024,
+    )
+
+    assert result.returncode == 0
+    assert result.stdout == b"o" * 1024
+    assert result.stderr == b"e" * 1024
+    assert result.stdout_bytes == output_bytes
+    assert result.stderr_bytes == output_bytes
+    assert result.stdout_truncated is True
+    assert result.stderr_truncated is True
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process-group assertion")
+def test_launch_cdk_timeout_kills_process_group():
+    script = """
+import subprocess
+import sys
+import time
+
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+print(child.pid, flush=True)
+time.sleep(60)
+"""
+    started = time.monotonic()
+
+    result = launch_cdk(
+        ["-c", script],
+        executable=sys.executable,
+        environment={},
+        timeout_seconds=0.2,
+    )
+
+    assert result.returncode == 124
+    assert result.timed_out is True
+    assert time.monotonic() - started < 3
+    child_pid = int(result.stdout)
+    for _ in range(100):
+        try:
+            os.kill(child_pid, 0)
+        except ProcessLookupError:
+            break
+        time.sleep(0.01)
+    else:
+        pytest.fail(f"child process {child_pid} survived launcher timeout")
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process-group assertion")
+def test_launch_cdk_closes_pipes_from_descendant_after_leader_exits():
+    script = """
+import subprocess
+import sys
+
+subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+"""
+    started = time.monotonic()
+
+    result = launch_cdk(
+        ["-c", script],
+        executable=sys.executable,
+        environment={},
+        timeout_seconds=0.2,
+    )
+
+    assert result.returncode == 0
+    assert time.monotonic() - started < 3
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX process-group assertion")
+def test_launch_cdk_timeout_kills_descendant_that_ignores_sigterm():
+    child_script = (
+        "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)"
+    )
+    script = f"""
+import subprocess
+import sys
+import time
+
+subprocess.Popen([sys.executable, "-c", {child_script!r}])
+time.sleep(60)
+"""
+    started = time.monotonic()
+
+    result = launch_cdk(
+        ["-c", script],
+        executable=sys.executable,
+        environment={},
+        timeout_seconds=0.2,
+    )
+
+    assert result.returncode == 124
+    assert result.timed_out is True
+    assert time.monotonic() - started < 3
+
+
+def test_launch_cdk_returns_126_when_executable_is_missing():
+    result = launch_cdk([], executable="missing-cdk-executable", environment={})
+
+    assert result.returncode == 126
+    assert b"missing-cdk-executable" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("timeout_seconds", "max_output_bytes"),
+    [
+        (0, 1024),
+        (-1, 1024),
+        (float("inf"), 1024),
+        (float("nan"), 1024),
+        (threading.TIMEOUT_MAX * 2, 1024),
+        (1e100, 1024),
+        (10**1000, 1024),
+        (True, 1024),
+        (1, -1),
+        (1, 1.5),
+        (1, True),
+        (1, MAX_CDK_OUTPUT_BYTES + 1),
+        (1, 10**1000),
+    ],
+)
+def test_launch_cdk_rejects_invalid_resource_limits(timeout_seconds, max_output_bytes):
+    with pytest.raises(CdkLauncherError):
+        launch_cdk(
+            [],
+            executable=sys.executable,
+            environment={},
+            timeout_seconds=timeout_seconds,
+            max_output_bytes=max_output_bytes,
         )

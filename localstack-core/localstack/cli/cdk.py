@@ -1,7 +1,16 @@
 import ipaddress
+import math
 import os
 import re
-from collections.abc import Collection, Iterable, Mapping
+import selectors
+import signal
+import subprocess
+import threading
+import time
+from collections.abc import Collection, Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from os import PathLike
+from typing import BinaryIO
 from urllib.parse import urlsplit
 
 from localstack.constants import AWS_REGION_US_EAST_1, DEFAULT_AWS_ACCOUNT_ID
@@ -46,10 +55,42 @@ _AWS_PUBLIC_DOMAINS = (
     "csp.hci.ic.gov",
     "sc2s.sgov.gov",
 )
+_TERMINATION_GRACE_SECONDS = 0.5
+MAX_CDK_TIMEOUT_SECONDS = 24 * 60 * 60
+MAX_CDK_OUTPUT_BYTES = 64 * 1024 * 1024
 
 
 class CdkLauncherError(ValueError):
     """Raised when CDK could escape the configured local environment."""
+
+
+@dataclass(frozen=True)
+class CdkLaunchResult:
+    returncode: int
+    timed_out: bool
+    stdout: bytes
+    stderr: bytes
+    stdout_bytes: int
+    stderr_bytes: int
+    stdout_truncated: bool
+    stderr_truncated: bool
+
+
+class _BoundedCapture:
+    def __init__(self, limit: int):
+        self.limit = limit
+        self.content = bytearray()
+        self.total_bytes = 0
+
+    def append(self, chunk: bytes) -> None:
+        self.total_bytes += len(chunk)
+        remaining = self.limit - len(self.content)
+        if remaining > 0:
+            self.content.extend(chunk[:remaining])
+
+    @property
+    def truncated(self) -> bool:
+        return self.total_bytes > len(self.content)
 
 
 def validate_local_endpoint(
@@ -143,6 +184,95 @@ def build_cdk_environment(
     return environment
 
 
+def launch_cdk(
+    arguments: Sequence[str],
+    *,
+    executable: str = "cdk",
+    environment: Mapping[str, str],
+    cwd: str | PathLike[str] | None = None,
+    timeout_seconds: float = 30 * 60,
+    max_output_bytes: int = 1024 * 1024,
+) -> CdkLaunchResult:
+    """Execute trusted CDK in a POSIX process group with bounded output and runtime."""
+    if os.name != "posix":
+        raise CdkLauncherError("safe CDK process supervision is not available on this platform")
+    if not executable or not isinstance(executable, str):
+        raise CdkLauncherError("CDK executable must be a non-empty string")
+    if isinstance(arguments, (str, bytes)) or not all(
+        isinstance(argument, str) for argument in arguments
+    ):
+        raise CdkLauncherError("CDK arguments must be a sequence of strings")
+    if (
+        isinstance(timeout_seconds, bool)
+        or not isinstance(timeout_seconds, (int, float))
+        or timeout_seconds <= 0
+        or timeout_seconds > MAX_CDK_TIMEOUT_SECONDS
+        or not math.isfinite(timeout_seconds)
+    ):
+        raise CdkLauncherError(
+            f"CDK timeout must be greater than 0 and at most {MAX_CDK_TIMEOUT_SECONDS} seconds"
+        )
+    if (
+        isinstance(max_output_bytes, bool)
+        or not isinstance(max_output_bytes, int)
+        or max_output_bytes < 0
+        or max_output_bytes > MAX_CDK_OUTPUT_BYTES
+    ):
+        raise CdkLauncherError(
+            f"CDK output limit must be an integer from 0 to {MAX_CDK_OUTPUT_BYTES} bytes"
+        )
+
+    stdout_capture = _BoundedCapture(max_output_bytes)
+    stderr_capture = _BoundedCapture(max_output_bytes)
+    popen_options = {
+        "cwd": cwd,
+        "env": dict(environment),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.PIPE,
+        "stderr": subprocess.PIPE,
+        "start_new_session": True,
+        "bufsize": 0,
+    }
+
+    try:
+        process = subprocess.Popen([executable, *arguments], **popen_options)
+    except (FileNotFoundError, PermissionError) as error:
+        stderr_capture.append(f"unable to execute {executable}: {error}\n".encode())
+        return _launch_result(126, False, stdout_capture, stderr_capture)
+    except OSError as error:
+        raise CdkLauncherError(f"unable to start CDK: {error}") from error
+
+    stop_readers = threading.Event()
+    readers = [
+        _start_reader(process.stdout, stdout_capture, stop_readers, "cdk-stdout"),
+        _start_reader(process.stderr, stderr_capture, stop_readers, "cdk-stderr"),
+    ]
+    timed_out = threading.Event()
+    stop_watchdog = threading.Event()
+    watchdog = threading.Thread(
+        target=_watch_timeout,
+        args=(process.pid, timeout_seconds, stop_watchdog, timed_out),
+        name="cdk-timeout",
+        daemon=True,
+    )
+    watchdog.start()
+    returncode: int
+    try:
+        returncode = process.wait()
+    except KeyboardInterrupt:
+        _terminate_process_group(process.pid)
+        returncode = 130
+    finally:
+        stop_watchdog.set()
+        watchdog.join()
+        _terminate_process_group(process.pid)
+        _finish_readers(process, readers, stop_readers)
+
+    if timed_out.is_set():
+        returncode = 124
+    return _launch_result(returncode, timed_out.is_set(), stdout_capture, stderr_capture)
+
+
 def _is_loopback(host: str) -> bool:
     try:
         return ipaddress.ip_address(host).is_loopback
@@ -167,3 +297,110 @@ def _canonical_host(host: str) -> str:
     if not canonical or canonical.endswith("."):
         raise CdkLauncherError("invalid endpoint hostname")
     return canonical
+
+
+def _start_reader(
+    stream: BinaryIO | None,
+    capture: _BoundedCapture,
+    stop: threading.Event,
+    name: str,
+) -> threading.Thread:
+    def drain() -> None:
+        if stream is None:
+            return
+        selector = selectors.DefaultSelector()
+        try:
+            os.set_blocking(stream.fileno(), False)
+            selector.register(stream, selectors.EVENT_READ)
+            while not stop.is_set():
+                for _ in selector.select(timeout=0.05):
+                    try:
+                        chunk = os.read(stream.fileno(), 64 * 1024)
+                    except BlockingIOError:
+                        continue
+                    if not chunk:
+                        return
+                    capture.append(chunk)
+        except (OSError, ValueError):
+            pass
+        finally:
+            selector.close()
+
+    thread = threading.Thread(target=drain, name=name, daemon=True)
+    thread.start()
+    return thread
+
+
+def _finish_readers(
+    process: subprocess.Popen[bytes],
+    readers: Collection[threading.Thread],
+    stop: threading.Event,
+) -> None:
+    deadline = time.monotonic() + 1
+    for reader in readers:
+        reader.join(max(0, deadline - time.monotonic()))
+    stop.set()
+    for reader in readers:
+        reader.join(0.2)
+    for stream in (process.stdout, process.stderr):
+        if stream is not None:
+            stream.close()
+    if any(reader.is_alive() for reader in readers):
+        raise CdkLauncherError("failed to stop CDK output readers")
+
+
+def _terminate_process_group(process_group_id: int) -> None:
+    if not _process_group_exists(process_group_id):
+        return
+    try:
+        os.killpg(process_group_id, signal.SIGTERM)
+    except (PermissionError, ProcessLookupError):
+        return
+    deadline = time.monotonic() + _TERMINATION_GRACE_SECONDS
+    while _process_group_exists(process_group_id) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    if _process_group_exists(process_group_id):
+        try:
+            os.killpg(process_group_id, signal.SIGKILL)
+        except (PermissionError, ProcessLookupError):
+            pass
+
+
+def _process_group_exists(process_group_id: int) -> bool:
+    try:
+        os.killpg(process_group_id, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return False
+
+
+def _watch_timeout(
+    process_group_id: int,
+    timeout_seconds: float,
+    stop: threading.Event,
+    timed_out: threading.Event,
+) -> None:
+    if stop.wait(timeout_seconds):
+        return
+    timed_out.set()
+    _terminate_process_group(process_group_id)
+
+
+def _launch_result(
+    returncode: int,
+    timed_out: bool,
+    stdout: _BoundedCapture,
+    stderr: _BoundedCapture,
+) -> CdkLaunchResult:
+    return CdkLaunchResult(
+        returncode=returncode,
+        timed_out=timed_out,
+        stdout=bytes(stdout.content),
+        stderr=bytes(stderr.content),
+        stdout_bytes=stdout.total_bytes,
+        stderr_bytes=stderr.total_bytes,
+        stdout_truncated=stdout.truncated,
+        stderr_truncated=stderr.truncated,
+    )

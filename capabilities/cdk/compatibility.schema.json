@@ -128,11 +128,21 @@
     "launcher": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["mode", "executable", "minimum_cli_for_endpoint_mode", "environment", "safety"],
+      "required": ["mode", "executable", "minimum_cli_for_endpoint_mode", "process_supervision", "environment", "safety"],
       "properties": {
         "mode": {"const": "thin-supervisor"},
         "executable": {"const": "standard-cdk"},
         "minimum_cli_for_endpoint_mode": {"type": "string", "minLength": 1},
+        "process_supervision": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["platform", "boundary", "detached_descendants"],
+          "properties": {
+            "platform": {"const": "posix"},
+            "boundary": {"const": "process-group"},
+            "detached_descendants": {"const": "not-contained"}
+          }
+        },
         "environment": {"$ref": "#/$defs/stringArray"},
         "safety": {"$ref": "#/$defs/stringArray"}
       }

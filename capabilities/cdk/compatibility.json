@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "manifest_sha256": "sha256:f6ce19e06915c62d44a687c7dbda1aa8158aa0dec37f5b61c46a1e1ffc3f265f",
+  "manifest_sha256": "sha256:954deaebca3f7272ae535f80dce47710c8233746cdf86c5cea7051d26e483bf5",
   "scope": "planning-baseline",
   "sources": [
     {
@@ -81,8 +81,13 @@
     "mode": "thin-supervisor",
     "executable": "standard-cdk",
     "minimum_cli_for_endpoint_mode": "2.177.0",
+    "process_supervision": {
+      "platform": "posix",
+      "boundary": "process-group",
+      "detached_descendants": "not-contained"
+    },
     "environment": ["AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3", "AWS_REGION", "CDK_DEFAULT_ACCOUNT", "CDK_DEFAULT_REGION"],
-    "safety": ["bounded-output", "fail-closed-no-aws-fallback", "process-tree-timeout", "reject-public-aws-endpoints", "strip-parent-aws-credentials"]
+    "safety": ["bounded-output", "fail-closed-no-aws-fallback", "process-group-timeout", "reject-public-aws-endpoints", "strip-parent-aws-credentials"]
   },
   "current_evidence": {
     "construct_language": "python",
