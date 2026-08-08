@@ -138,7 +138,10 @@
         "iam:CreateRole",
         "iam:PutRolePolicy",
         "iam:AttachRolePolicy",
-        "iam:GetRolePolicy"
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:DeleteRole",
+        "iam:GetRole"
       ]
     },
     "read": {
@@ -154,6 +157,9 @@
         "iam:UpdateRole",
         "iam:UpdateRoleDescription",
         "iam:UpdateAssumeRolePolicy",
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
         "iam:DetachRolePolicy",
         "iam:AttachRolePolicy",
         "iam:DeleteRolePermissionsBoundary",

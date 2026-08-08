@@ -454,6 +454,17 @@ preserves interactive stdin on terminals, and supervises a POSIX process
 group. This is launcher evidence only: it does not
 promote any language or scenario until the real CLI matrix below passes.
 
+The first bootstrap-update blocker is now covered at provider level:
+`AWS::IAM::Role` reconciles mutable trust, managed and inline policies,
+permissions boundaries, description, session duration, and owned tags without
+changing `RoleId` or deleting external children. Its unit gate models the
+critical bootstrap v28-to-v32 `DeploymentActionRole` delta and proves the
+five-call provider budget: one identity read, one collision-safety read, and
+three mutations. This is not yet bootstrap promotion evidence; the
+next gate must deploy the pinned official v28 template, update the same stack
+to the pinned official v32 template, and verify all five role identities and
+externally managed policies through the CloudFormation v2 engine.
+
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK
 2.177.0 or later, endpoint environment injection, and paid-plan asset
