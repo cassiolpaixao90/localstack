@@ -1,0 +1,630 @@
+# AWS Feature Parity Roadmap
+
+Status: proposed  
+Created: 2026-08-08  
+Scope baseline: public archive checkout `8b9a79f05846835cf4dff63ab7eefdde9df83783`
+dated 2026-03-23 and the public AWS/LocalStack catalog available on the creation
+date. `v4.14.0` is a release reference, not a proven equivalent tag for this checkout.
+
+## 1. Objective
+
+Evolve the public LocalStack fork into a high-fidelity, high-performance local
+AWS emulator, including capabilities currently distributed in paid LocalStack
+plans, through an independent clean-room implementation.
+
+The project should target a versioned AWS catalog with explicit fidelity levels.
+"All AWS features" is not a fixed endpoint: AWS changes continuously, and some
+managed or physical data planes cannot be reproduced locally with complete
+fidelity. The defensible target is:
+
+- broad protocol and control-plane coverage;
+- high semantic fidelity for prioritized development journeys;
+- delegated local engines where they provide useful data-plane behavior;
+- explicit, machine-readable deviations rather than false success responses;
+- predictable local performance guarded by regression tests.
+
+## 2. Executive decision
+
+1. Keep Python as the control plane, provider framework, plugin surface, and
+   compatibility layer.
+2. Build a common kernel for identity, IAM, state, persistence, scheduling,
+   asynchronous delivery, and observability before expanding the service count.
+3. Deliver complete vertical journeys, including IAM, CloudFormation,
+   CloudControl, CDK, persistence, and performance, rather than isolated CRUD
+   handlers.
+4. Use Rust or Go only for measured hotspots or autonomous backends with a
+   stable boundary. Do not perform a big-bang rewrite.
+5. Treat documentation, API models, validation freshness, and capability status
+   as versioned inputs to an automated catalog.
+
+## 3. Clean-room policy
+
+### Allowed sources
+
+- Public AWS documentation.
+- Public Botocore and Smithy models and traits.
+- Public CloudFormation Resource Specifications.
+- Public AWS CDK, Cloud Assembly, and bootstrap specifications.
+- Black-box experiments run against an AWS account controlled by the project.
+- Open-source projects with audited, distribution-compatible licenses.
+
+### Prohibited sources and actions
+
+- Extracting or decompiling paid LocalStack images.
+- Copying proprietary implementation code, tests, snapshots, UI, or assets.
+- Reproducing proprietary licensing or hosted SaaS mechanisms.
+- Incorporating dependencies with incompatible licenses without legal and
+  architectural approval.
+
+The clean-room artifact is a neutral behavioral specification: inputs, outputs,
+errors, state transitions, observable timing, and side effects. It must not
+describe the internal implementation of a paid product.
+
+Each clean-room requirement must eventually record:
+
+```yaml
+source:
+version_or_tag:
+commit_or_sha256:
+license:
+retrieved_at:
+covered_features:
+experiment_reference:
+supersedes:
+```
+
+Legal review remains necessary and is not replaced by this engineering policy.
+The first static inventory records the pinned Botocore version, license, URI,
+model hashes, and inventory digest. Retrieval time, generator commit, dependency
+digests, and experiment references remain explicit provenance gaps for the next
+catalog iteration.
+
+### Fork governance prerequisite
+
+The [upstream notice](../README.md) declares the public repository archived and
+read-only following consolidation into a unified LocalStack image. Before a
+redistributable fork or feature release, record an explicit go/no-go decision
+covering `LICENSE.txt` and referenced EULA terms, trademark and product naming,
+attribution, contribution licensing, security reporting and embargo handling,
+release signing/SBOM ownership, code owners/reviewers, and a policy for consuming
+AWS model/documentation changes without an active public upstream. No capability
+roadmap milestone implies permission to use LocalStack trademarks or proprietary
+artifacts.
+
+### Comparable projects and reuse posture
+
+| Project | Useful lesson | Project posture |
+|---|---|---|
+| [Moto](https://github.com/getmoto/moto) (Apache-2.0) | Broad Python service models and fast in-process test doubles | Keep as a pinned, observable fallback; never equate delegation with parity |
+| [ElasticMQ](https://github.com/softwaremill/elasticmq) (Apache-2.0) | Asynchronous SQS semantics, strict limits, persistence, and a dedicated performance suite | Evaluate as a replaceable SQS backend against the same conformance corpus |
+| [Adobe S3Mock](https://github.com/adobe/S3Mock) (Apache-2.0) | Isolated container/Testcontainers distribution and an explicit supported-operation matrix | Reuse packaging and compatibility-matrix ideas; compare S3 behavior black-box |
+| [kinesis-mock](https://github.com/etspaceman/kinesis-mock) (MIT) | Standalone Kinesis process, configurable lifecycle delays, account/region partitioning, and persistence | Candidate delegated data plane after differential, soak, and crash testing |
+| [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) | AWS-maintained local data plane distributed as JAR, Maven artifact, and container | Keep behind a process boundary; pin version and distribution terms |
+| [MinIO](https://github.com/minio/minio) (AGPL-3.0, archived) | High-performance S3-compatible storage architecture and operational tooling | Architectural study only; do not incorporate or distribute its code without explicit legal approval |
+
+The common lesson is to separate the AWS-facing protocol/control plane from
+replaceable local data planes. Every delegated engine needs an adapter contract,
+version and license record, health and shutdown lifecycle, resource limits,
+capability declaration, and the same AWS differential suite. An engine may improve
+throughput without raising the operation above `fallback` until semantics pass.
+
+The implementations also span distinct boundaries: Moto is Python/in-process;
+ElasticMQ is an actor-based Scala/JVM service that can run embedded or standalone;
+S3Mock is Kotlin/Spring Boot in a process or container; kinesis-mock exposes an
+http4s server for JVM and Node distributions; and MinIO is Go. This demonstrates
+that isolated backends and HTTP contracts are viable, not that a language rewrite
+will improve fidelity or speed. Only profiling plus differential tests can justify
+moving a measured component.
+
+## 4. Baseline assessment
+
+The deterministic Botocore-denominator inventory currently finds:
+
+- 415 Botocore services and 17,854 operations in the denominator;
+- 37 generated API interfaces and 35 services with registered providers;
+- 15,004 missing operations, 286 generated scaffolds, 1,939 fallback
+  candidates, and 625 partial/native candidates;
+- zero operations promoted to `native` or `parity-pass` without runtime proof;
+- 102 CloudFormation resource types found by static source analysis;
+- approximately 4,600 tests or validation entries;
+- performance tests concentrated mainly on SQS and DynamoDB, without systematic
+  CI regression gates.
+
+The generated baseline is available in
+[`capabilities/report.md`](../capabilities/report.md), with its pinned Botocore
+denominator in [`capabilities/catalog.lock.json`](../capabilities/catalog.lock.json).
+
+The existing generator in
+[`localstack-core/localstack/aws/scaffold.py`](../localstack-core/localstack/aws/scaffold.py)
+is a useful foundation. It should also generate or index IAM metadata, ARN
+templates, endpoint rules, idempotency, pagination, checksums, streaming traits,
+CloudFormation metadata, and capability manifests.
+
+## 5. Capability catalog
+
+The current commercial matrix is evidence of current packaging, not proof that
+every capability belonged to the same tier at the fork date. The catalog must
+therefore retain both `observed_at` and `source_version`.
+
+Primary references:
+
+- [Current LocalStack licensing matrix](https://docs.localstack.cloud/aws/licensing/)
+- [Current LocalStack service catalog](https://docs.localstack.cloud/aws/services/)
+- [LocalStack 4.14 release](https://blog.localstack.cloud/localstack-for-aws-release-v-4-14-0/)
+
+### Base service backlog
+
+- API Gateway HTTP, WebSocket, and Management APIs.
+- Cognito User Pools and Identity Pools.
+- ECR, ECS, and ElastiCache.
+- RDS and RDS Data API.
+- Elastic Load Balancing, ELBv2, and CloudFront.
+- Amazon MQ and SES v2.
+- CodeCommit, CodeArtifact, CodeBuild, and CodeConnections.
+- IoT, AppConfig, Application Auto Scaling, and EC2 Auto Scaling.
+
+### Ultimate service backlog
+
+- EventBridge Pipes and MWAA.
+- Athena, Glue, Lake Formation, MSK, Flink, EMR, and EMR Serverless.
+- EKS, Batch, Elastic Beanstalk, and Serverless Application Repository.
+- AppSync, Amplify, and Cloud Map.
+- CodeDeploy, CodePipeline, FIS, and X-Ray.
+- Organizations, Account Management, CloudTrail, RAM, WAF, Verified
+  Permissions, Private CA, Identity Store, and Identity Center.
+- DocumentDB, MemoryDB, Neptune, and Timestream.
+- Transfer Family, DMS, EFS, Backup, and Glacier.
+- Bedrock, SageMaker, Textract, MediaConvert, and Pinpoint.
+- IoT Data and IoT Wireless.
+- Managed Blockchain, Cost Explorer, Shield, and remaining catalog services.
+
+### Cross-cutting and platform backlog
+
+- Local persistence, export, import, and schema migration.
+- IAM Policy Enforcement.
+- IAM Policy Streams.
+- AWS resource replication/import.
+- Cloud Pods-compatible snapshot packaging, using a project-owned format.
+- Stack diagnostics and a project-owned causal graph/inspector.
+- Fault injection and resiliency testing.
+- Air-gapped, reproducible images with SBOM and offline dependencies.
+- Kubernetes operator/executor.
+- Standard OIDC, SAML, and SCIM integration if a multi-user product is built.
+
+Hosted sandbox, portal, billing, support, and other SaaS functionality are not
+AWS parity and must not block the emulator roadmap.
+
+## 6. Capability model
+
+Every operation must have one unambiguous implementation state:
+
+- `missing`;
+- `scaffold`;
+- `fallback`;
+- `partial`;
+- `native`;
+- `parity-pass`.
+
+Fidelity is tracked independently:
+
+- `L0`: protocol parsing and serialization;
+- `L1`: control-plane CRUD;
+- `L2`: useful local data plane;
+- `L3`: cross-service integrations;
+- `L4`: IAM, lifecycle, errors, persistence, and IaC fidelity;
+- `L5`: validated behavior and declared performance SLO.
+
+Example:
+
+```yaml
+service: pipes
+catalog:
+  source: botocore
+  version: 1.42.59
+provider:
+  name: native-v1
+  state_schema: 1
+operations:
+  CreatePipe:
+    status: native
+    fidelity: L3
+    authorization: pass
+    scenarios:
+      valid_create:
+        parity: pass
+        aws_validated_at: 2026-08-01
+      invalid_role:
+        parity: pass
+      duplicate_name:
+        parity: fail
+    dependencies:
+      - iam:PassRole
+      - events:EventBus
+      - lambda:InvokeFunction
+    cfn_resources:
+      - AWS::Pipes::Pipe
+    known_deviations: []
+```
+
+## 7. Target architecture
+
+```text
+Versioned AWS/CDK catalog
+        |
+        v
+Deterministic generator
+  APIs | IAM | ARN | CFN | manifests
+        |
+        v
+Common kernel
+  identity and authorization
+  versioned state and persistence
+  clock and durable scheduler
+  event bus and transactional outbox
+  tagging, pagination, and idempotency
+  bounded concurrency and backpressure
+  capability registry and observability
+        |
+        v
+Service providers
+  native control plane
+  native or delegated data plane
+  typed integrations
+  CloudFormation and CloudControl
+```
+
+### Provider rules
+
+- Register implementation origin per operation.
+- Treat Moto and HTTP fallback as temporary migration states.
+- Do not access another provider's private store.
+- Use a typed internal client for synchronous service calls.
+- Use an event bus and durable scheduler for asynchronous work.
+- Propagate the original or AWS-equivalent service principal explicitly.
+- Keep alternate providers selectable to support canary migrations.
+
+### State and persistence
+
+Evolve `AccountRegionBundle` into a state contract with:
+
+- schema version per service;
+- persistent DTOs separate from runtime objects;
+- explicit `N -> N+1` migrations;
+- resource-level concurrency and optimistic revisions;
+- injectable clock and deterministic test IDs;
+- state machines for asynchronous resources;
+- transactional outbox for state changes and event publication;
+- atomic snapshot writes and verified restore;
+- indexes by ARN, name, tag, and relationship.
+
+Incremental snapshots or a WAL should be implemented only after cross-service
+snapshot semantics are specified.
+
+### IAM
+
+IAM is a gateway/kernel concern, not duplicated provider logic. Implement in
+this order:
+
+1. principal and authentication context;
+2. wildcard actions/resources and explicit deny;
+3. identity and resource policies;
+4. session policies and permission boundaries;
+5. `NotAction`, `NotResource`, `Principal`, and `NotPrincipal`;
+6. condition operators and global context keys;
+7. principal, request, and resource tags;
+8. `iam:PassRole`;
+9. KMS key policies and grants;
+10. cross-account policies and Organizations SCPs.
+
+### Cross-service delivery
+
+The event envelope must include identity, trace, causation, attempt, scheduling,
+and deduplication information. Required semantics include idempotency, retry with
+backoff and jitter, DLQ, ordering where applicable, deadlines, cancellation,
+trace propagation, and delivery metrics.
+
+Priority integration paths:
+
+- S3 to SQS, SNS, Lambda, and EventBridge;
+- DynamoDB Streams and Kinesis to Lambda, Pipes, and Firehose;
+- EventBridge and Scheduler to common targets;
+- Pipes source to enrichment to target;
+- CloudWatch alarms to SNS and Lambda;
+- Lambda to Logs, X-Ray, destinations, and DLQ;
+- Step Functions AWS SDK integrations;
+- CloudFormation through public service APIs.
+
+### CloudFormation and CloudControl
+
+CloudFormation must use the public internal service APIs, never provider stores.
+Each resource type must define create, read, update, delete, list,
+stabilization, import, drift, tagging, replacement, and rollback behavior.
+
+CloudControl becomes a facade over the same resource-provider registry. A
+resource is not complete if an unimplemented update is reported as success.
+
+## 8. Implementation roadmap
+
+### Wave 0: foundation and measurable truth, months 0-3
+
+- Complete and publish the fork governance and redistribution go/no-go record.
+- Lock Botocore, Smithy, CloudFormation, and CDK catalogs.
+- Classify all operations by origin and fidelity.
+- Build an AWS-versus-local differential harness.
+- Introduce capability manifests and documentation provenance.
+- Version metrics ingestion and import dispatch evidence into the capability catalog.
+- Establish state, clock, jobs, event bus, and backpressure contracts.
+- Implement foundational IAM and account/region isolation.
+- Add performance instrumentation and baselines.
+- Deliver two pilot journeys:
+  - API Gateway to Lambda to Logs;
+  - S3 to SQS to Lambda.
+
+### Wave 1: usable serverless and CDK, months 3-6
+
+- API Gateway v2 HTTP and WebSocket APIs.
+- Lambda ZIP and container-image lifecycle.
+- Minimum ECR required for image assets.
+- Cognito basics for prioritized journeys.
+- EventBridge common targets, Scheduler, and basic Pipes.
+- IAM, persistence, CloudFormation, and CloudControl for every delivered slice.
+- Modern CDK bootstrap, file assets, Docker assets, deploy, update, and destroy.
+- Six to eight complete journeys without fallback.
+
+### Wave 2: integrations and platform, months 6-12
+
+- DynamoDB and Kinesis Streams event source mappings.
+- Filtering, batching, partial failures, retries, destinations, and DLQ.
+- Priority Step Functions integrations.
+- CDK custom resources, transforms, and nested stacks.
+- ECR to ECS to ALB to Cloud Map.
+- RDS/Data API, ElastiCache, Secrets, and KMS integration.
+- Kinesis to Firehose to S3.
+- CodeBuild and initial CodePipeline journeys.
+- CDK and Terraform apply/destroy gates.
+
+Expected result with 10-14 engineers: 15-25 useful control planes and 8-12
+services at L3/L4.
+
+### Wave 3: broad surface, months 12-24
+
+- Athena and Glue Catalog.
+- MSK and EKS/k3s.
+- WAF, CloudTrail, X-Ray, Organizations, and Verified Permissions.
+- AppSync with Cognito, Lambda, and DynamoDB.
+- Backup, replication, and IAM Policy Streams.
+- Control planes for specialized databases, analytics, media, and ML.
+
+Expected result with 10-14 engineers: 40-60 declared control planes and 15-25
+services at L3/L4. Covering nearly the full Base/Ultimate catalog within 24-36
+months would require scaling toward 18-25 engineers, while retaining explicit
+limitations for data planes that cannot be reproduced faithfully.
+
+## 9. CDK local support
+
+The project must make the real CDK toolkit work against local endpoints; it
+must not reimplement client-side CDK behavior.
+
+| Capability | Local responsibility and dependencies |
+|---|---|
+| `cdk synth` | No special API; synthesis remains client-side |
+| Modern bootstrap | CloudFormation, S3, ECR, SSM, IAM, STS, optional KMS |
+| File assets | S3 multipart, checksums, and presigned URLs |
+| Docker assets | ECR authentication, layers, manifests, push, and pull |
+| Context lookups | EC2/VPC/AZ, Route53, SSM, STS, and queried services |
+| Deploy/update/no-op | Change sets, events, outputs, waiters, and rollback |
+| Diff | Correct templates and change-set behavior |
+| Destroy | Dependencies, retain, and deletion policies |
+| Hotswap | Direct service updates with correct CloudFormation fallback |
+| Custom resources | Lambda/SNS invocation, callback, timeout, and rollback |
+| Transforms | SAM, Include, LanguageExtensions, and Lambda macros |
+| Nested stacks | Parent/child lifecycle, S3 templates, outputs, and rollback |
+| CloudControl | CRUD over the shared resource-provider registry |
+
+The existing scenario harness uses a `BootstraplessSynthesizer` and documents
+that CDK-generated assets are unsupported in
+[`localstack-core/localstack/testing/scenario/provisioning.py`](../localstack-core/localstack/testing/scenario/provisioning.py).
+Current tests exercise bootstrap templates but do not prove compatibility with
+the real CLI. Add black-box tests that invoke the actual `cdk` binary.
+
+Version matrix:
+
+- supported Node LTS versions;
+- CDK CLI minimum, pinned, and latest;
+- `aws-cdk-lib` minimum, pinned, and latest independently;
+- current bootstrap and upgrade from the preceding version;
+- TypeScript and Python as full suites;
+- Java, .NET, and Go as synth/deploy smoke tests;
+- Linux amd64 and arm64.
+
+Gates cover `init`, `list`, `synth`, bootstrap, assets, deploy, no-op, update,
+rollback, diff, destroy, retain, transforms, custom resources, nested stacks,
+hotswap, and uncached context lookups.
+
+References:
+
+- [AWS CDK bootstrapping](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html)
+- [AWS CDK deployment](https://docs.aws.amazon.com/cdk/v2/guide/deploy.html)
+- [Cloud Assembly Schema](https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.cloud_assembly_schema/README.html)
+- [LocalStack CDK integration documentation](https://docs.localstack.cloud/aws/connecting/infrastructure-as-code/aws-cdk/)
+
+Client-side construct trees, jsii, synthesis, asset hashing, Docker builds,
+`cdk.context.json`, CLI prompts, and the watch loop do not need emulation.
+
+## 10. Documentation ingestion and freshness
+
+"Analyze all documentation" must be a repeatable pipeline rather than a
+one-time reading exercise.
+
+1. Pin versions and hashes of Botocore, Smithy, CDK, bootstrap templates,
+   CloudFormation specifications, and public documentation inputs.
+2. Generate an index by service, operation, shape, resource type, construct,
+   integration, and error.
+3. Produce a semantic diff for every upstream release.
+4. Open or update capability-manifest entries automatically.
+5. Identify new operations, properties, endpoint rules, and resource types.
+6. Revalidate affected behavior against AWS.
+7. Treat skipped snapshots, ignored paths, and stale validations as debt.
+8. Use a default AWS-validation freshness window of 90 days for active scope.
+9. Never manually modify generated API files, snapshots, or validation files.
+
+Generated tests establish protocol and shape coverage. Human-authored tests
+establish behavior, lifecycle, IAM, integrations, and side effects.
+
+## 11. Performance program
+
+Performance only counts when semantic invariants continue to pass: ordering,
+isolation, retries, idempotency, and absence of loss or corruption.
+
+### Baseline environments
+
+- `perf-pr`: 4 vCPU, 8 GiB, amd64, persistence off.
+- `perf-nightly`: amd64 and arm64, 8 vCPU, 16 GiB, bind mount and tmpfs,
+  persistence on and off.
+
+Record the image digest, commit, Python, Botocore, Moto, Java, Docker, kernel,
+filesystem, CPU/memory/PID/FD limits, gateway mode, worker counts, cache state,
+and Lambda image state.
+
+### Workloads
+
+- Gateway protocols: JSON, Query, EC2, REST-JSON, REST-XML, and CBOR.
+- Concurrency: 1, 8, 32, 128, overload, and recovery.
+- Payloads: empty, 1 KiB, 1 MiB, and large streaming payloads.
+- S3: object, range, checksum, multipart, same-key contention.
+- SQS: standard/FIFO, batch, long polling, visibility, redelivery, and DLQ.
+- DynamoDB: CRUD, conditional writes, transactions, scans, queries, and streams.
+- Lambda: cold/warm, ZIP/image, sync/async, versions, and concurrency.
+- Cross-service journeys from the implementation roadmap.
+
+Measure p50, p95, p99, p99.9, throughput, CPU/request, allocations, RSS/PSS,
+GC, threads, FDs, context switches, event-loop lag, queue wait, lock wait, disk,
+network, snapshot pauses, cold-start stages, backlog, and recovery.
+
+### Initial gates
+
+- throughput at least 95% of the accepted baseline;
+- p95 and p99 no worse than baseline plus 10%;
+- CPU/request and allocation/request no worse than plus 10%;
+- startup and first request no worse than plus 10%;
+- nominal errors below 0.1%;
+- no data loss or corruption;
+- no monotonic thread or FD growth;
+- final soak RSS no worse than plus 5% or plus 50 MiB;
+- queues return to normal after overload.
+
+The current code suggests hypotheses requiring measurement, including a large
+gateway worker ceiling, potentially unbounded queues, broad locks in SQS and
+stores, SQS message copying, S3 reader position locking, DynamoDB process/HTTP
+overhead, linear Lambda environment lookup, a global cold-start semaphore, and
+full in-memory persistence snapshots.
+
+Optimization order:
+
+```text
+instrumentation
+  -> reproducible baseline
+  -> bounded queues and backpressure
+  -> service-level contention
+  -> incremental persistence
+  -> experimental gateway/storage changes
+```
+
+## 12. Language decision
+
+### Recommendation
+
+Keep Python for providers, Botocore/Moto compatibility, plugins, lifecycle,
+state orchestration, and most tests.
+
+- Use Rust/PyO3 only for proven CPU-bound kernels such as codecs, parsing,
+  serialization, shape validation, or compact indexes.
+- Use Go through a process or Unix-domain-socket boundary for autonomous
+  networking, registry, queue, event-bus, or storage components.
+- Do not use Go FFI as the first integration strategy.
+- Do not rewrite the entire emulator in Go, Rust, or Java.
+
+### Required 4-6 week experiment
+
+1. Profile representative S3, SQS, DynamoDB, Lambda, routing, and CBOR paths.
+2. Select a hotspot responsible for at least 25% of end-to-end CPU.
+3. Define a narrow immutable boundary and a golden compatibility corpus.
+4. Compare optimized Python with Rust/PyO3, or a Go sidecar if the hotspot is
+   naturally network/process-bound.
+5. Run validated behavior, concurrency, soak, cancellation, crash, shutdown,
+   amd64, and arm64 tests.
+6. Produce reproducible wheels/binaries, SBOM, symbols, fallback, and a
+   maintenance estimate.
+
+Approve a native component only if it achieves all of the following:
+
+- at least 30% less CPU/request;
+- at least 25% better end-to-end throughput or p99;
+- FFI/RPC conversion below 15% of total time;
+- no more than 10% regression in RSS or startup;
+- all relevant golden and validated tests pass;
+- no error, header, ordering, isolation, or streaming divergence;
+- reproducible amd64 and arm64 releases;
+- working Python fallback and compatible provider/plugin APIs.
+
+Stop the experiment if the gain is only visible in a microbenchmark, if the
+real bottleneck is a lock/backend/disk, if large payloads require extra copies,
+or if Botocore models must be duplicated across languages.
+
+## 13. Definition of Done
+
+An operation is complete only when:
+
+- its generated contract matches the pinned catalog;
+- dispatch origin is native, with no hidden fallback;
+- validation and service-specific errors match AWS;
+- positive and negative paths have AWS-first snapshots;
+- IAM allow and deny behavior works;
+- account and region state is isolated;
+- pagination, tags, and idempotency work;
+- lifecycle and eventual consistency are tested;
+- downstream integrations confirm side effects;
+- persistence, reset, restore, and migration pass;
+- a CloudFormation resource provider exists when applicable;
+- CloudControl and real CDK pass when applicable;
+- no critical path is skipped or ignored;
+- AWS validation is within the configured freshness window;
+- latency, throughput, CPU, memory, queues, and correctness satisfy the SLO;
+- every remaining deviation is declared in the capability manifest.
+
+A service is complete only when every operation in its versioned scope passes
+and its prioritized journeys pass through direct API, CloudFormation, and at
+least one real IaC client.
+
+The program may claim complete coverage of a frozen catalog only when it has no
+undeclared `missing`, `fallback`, or `partial` entries. It must not equate HTTP
+success, generated method presence, or control-plane CRUD with full AWS parity.
+
+## 14. Team shape and capacity
+
+Suggested initial allocation for 10-14 engineers:
+
+- 2 platform, catalog, protocol, and code generation;
+- 2 IAM and security;
+- 2 conformance, AWS validation, CloudFormation, and CDK;
+- 4-6 services and integrations;
+- 1 performance/runtime;
+- 1 release, dependencies, supply chain, and multi-architecture delivery.
+
+After the first year, reserve 25-40% of capacity for upstream model updates,
+AWS behavior changes, flaky validation, migrations, dependency CVEs, and
+compatibility maintenance.
+
+## 15. First implementation artifacts
+
+Wave 0 should materialize these durable artifacts before broad feature work:
+
+1. machine-readable AWS/CDK capability matrix;
+2. clean-room provenance policy and source registry;
+3. architecture decision records for the kernel, IAM, state, events, and
+   provider boundaries;
+4. AWS differential conformance harness;
+5. reproducible performance harness and accepted baseline;
+6. CDK CLI compatibility matrix;
+7. pilot specifications for API Gateway to Lambda to Logs and S3 to SQS to
+   Lambda.
