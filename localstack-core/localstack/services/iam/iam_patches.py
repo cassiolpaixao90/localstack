@@ -9,11 +9,15 @@ from moto.iam.models import (
     User,
 )
 from moto.iam.models import Role as MotoRole
-from moto.iam.policy_validation import VALID_STATEMENT_ELEMENTS
+from moto.iam.policy_validation import (
+    VALID_STATEMENT_ELEMENTS,
+    VALID_VERSIONS,
+    IAMTrustPolicyDocumentValidator,
+)
 
 from localstack import config
 from localstack.constants import TAG_KEY_CUSTOM_ID
-from localstack.utils.patch import patch
+from localstack.utils.patch import Patch, patch
 
 ADDITIONAL_MANAGED_POLICIES = {
     "AWSLambdaExecute": {
@@ -78,6 +82,20 @@ def apply_iam_patches():
 
     if "Principal" not in VALID_STATEMENT_ELEMENTS:
         VALID_STATEMENT_ELEMENTS.append("Principal")
+
+    # Moto requires Version=2012-10-17 for every policy document, while IAM trust
+    # policies also accept the legacy 2008 language version when Version is omitted.
+    def _validate_trust_policy_version(self: IAMTrustPolicyDocumentValidator) -> None:
+        version = self._policy_json.get("Version", "2008-10-17")
+        if version not in VALID_VERSIONS:
+            raise ValueError(f"unsupported trust policy version: {version}")
+
+    trust_policy_version_patch = Patch(
+        IAMTrustPolicyDocumentValidator,
+        "_validate_version",
+        _validate_trust_policy_version,
+    )
+    trust_policy_version_patch.apply()
 
     # patch policy __init__ to set document as attribute
 

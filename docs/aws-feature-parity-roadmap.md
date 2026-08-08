@@ -460,10 +460,13 @@ permissions boundaries, description, session duration, and owned tags without
 changing `RoleId` or deleting external children. Its unit gate models the
 critical bootstrap v28-to-v32 `DeploymentActionRole` delta and proves the
 five-call provider budget: one identity read, one collision-safety read, and
-three mutations. This is not yet bootstrap promotion evidence; the
-next gate must deploy the pinned official v28 template, update the same stack
-to the pinned official v32 template, and verify all five role identities and
-externally managed policies through the CloudFormation v2 engine.
+three mutations. The local CloudFormation v2 gate now deploys the pinned
+official v28 template and updates the same stack to the byte-exact pinned v32
+template. It verifies all five role identities and ARNs, external managed
+policy ownership, the v32 trust/inline/managed policy deltas, the SSM version,
+and strict cleanup of the retained bucket. This promotes only the bootstrap
+engine/API scenario to `api-simulated`; real CLI and fresh AWS differential
+evidence remain required.
 
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "manifest_sha256": "sha256:38fe7c0bc0d987c38f1e92bcf983dbcff45a803b56fe5df9308a7c5f85298938",
+  "manifest_sha256": "sha256:d8a484da67660c0caeb4a25a560e025abbc8c9373a83e4f61526bb10d9df0371",
   "scope": "planning-baseline",
   "sources": [
     {
@@ -113,7 +113,7 @@
     ]
   },
   "capabilities": [
-    {"id": "bootstrap", "status": "template-only", "languages": [], "dependencies": ["cloudformation", "ecr", "iam", "kms", "s3", "ssm", "sts"], "evidence": ["tests/aws/services/cloudformation/resources/test_cdk.py"], "gaps": ["bootstrap-cli-not-run", "validation-stale"]},
+    {"id": "bootstrap", "status": "api-simulated", "languages": [], "dependencies": ["cloudformation", "ecr", "iam", "kms", "s3", "ssm", "sts"], "evidence": ["tests/aws/services/cloudformation/resources/test_cdk.py"], "gaps": ["bootstrap-cli-not-run", "validation-stale"]},
     {"id": "context-lookups", "status": "untested", "languages": [], "dependencies": ["ec2", "route53", "ssm", "sts"], "evidence": [], "gaps": ["real-cli-not-run"]},
     {"id": "custom-resources", "status": "untested", "languages": [], "dependencies": ["lambda", "sns"], "evidence": [], "gaps": ["transparent-endpoint-injection-not-validated"]},
     {"id": "deploy", "status": "api-simulated", "languages": ["python"], "dependencies": ["cloudformation"], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["real-cli-not-run"]},

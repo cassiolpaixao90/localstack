@@ -1,7 +1,9 @@
 import os
 from collections.abc import Callable
+from types import SimpleNamespace
 
 import pytest
+from botocore.exceptions import ClientError
 from localstack_snapshot.snapshots.transformer import SortingTransformer
 from tests.aws.services.cloudformation.conftest import skip_if_legacy_engine
 
@@ -9,6 +11,85 @@ from localstack.aws.api.cloudformation import Parameter
 from localstack.testing.pytest import markers
 from localstack.utils.files import load_file
 from localstack.utils.strings import short_uid
+
+
+def _delete_versioned_bucket(aws_client, bucket_name: str) -> None:
+    for page in aws_client.s3.get_paginator("list_object_versions").paginate(Bucket=bucket_name):
+        objects = [
+            {"Key": item["Key"], "VersionId": item["VersionId"]}
+            for collection in ("Versions", "DeleteMarkers")
+            for item in page.get(collection, [])
+        ]
+        for offset in range(0, len(objects), 1000):
+            aws_client.s3.delete_objects(
+                Bucket=bucket_name,
+                Delete={"Objects": objects[offset : offset + 1000], "Quiet": True},
+            )
+
+    for page in aws_client.s3.get_paginator("list_multipart_uploads").paginate(Bucket=bucket_name):
+        for upload in page.get("Uploads", []):
+            aws_client.s3.abort_multipart_upload(
+                Bucket=bucket_name,
+                Key=upload["Key"],
+                UploadId=upload["UploadId"],
+            )
+
+    aws_client.s3.delete_bucket(Bucket=bucket_name)
+    try:
+        aws_client.s3.head_bucket(Bucket=bucket_name)
+    except ClientError as error:
+        if error.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return
+        raise
+    raise AssertionError(f"retained bootstrap bucket still exists: {bucket_name}")
+
+
+@pytest.fixture
+def cdk_bootstrap_resources(aws_client):
+    attachments, cleanup_target = [], {}
+
+    def _register(stack_name: str, bucket_name: str) -> None:
+        cleanup_target.update(stack_name=stack_name, bucket_name=bucket_name)
+
+    def _attach(role_name: str, policy_arn: str):
+        response = aws_client.iam.attach_role_policy(
+            RoleName=role_name,
+            PolicyArn=policy_arn,
+        )
+        attachments.append((role_name, policy_arn))
+        return response
+
+    yield SimpleNamespace(register=_register, attach=_attach)
+
+    try:
+        for role_name, policy_arn in reversed(attachments):
+            aws_client.iam.detach_role_policy(
+                RoleName=role_name,
+                PolicyArn=policy_arn,
+            )
+    finally:
+        stack_name = cleanup_target.get("stack_name")
+        bucket_name = cleanup_target.get("bucket_name")
+        try:
+            if stack_name:
+                try:
+                    aws_client.cloudformation.delete_stack(StackName=stack_name)
+                    aws_client.cloudformation.get_waiter("stack_delete_complete").wait(
+                        StackName=stack_name,
+                        WaiterConfig={"Delay": 1, "MaxAttempts": 60},
+                    )
+                except ClientError as error:
+                    if error.response.get("Error", {}).get("Code") != "ValidationError":
+                        raise
+        finally:
+            if bucket_name:
+                try:
+                    aws_client.s3.head_bucket(Bucket=bucket_name)
+                except ClientError as error:
+                    if error.response.get("ResponseMetadata", {}).get("HTTPStatusCode") != 404:
+                        raise
+                else:
+                    _delete_versioned_bucket(aws_client, bucket_name)
 
 
 class TestCdkInit:
@@ -181,6 +262,138 @@ class TestCdkInit:
         aws_client.cloudformation.get_template(StackName=stack_name, TemplateStage="Original")
 
         # TODO: create scenario where the template is different to catch cdk behavior
+
+    @markers.aws.only_localstack
+    @skip_if_legacy_engine()
+    def test_cdk_bootstrap_upgrade_v28_to_v32_preserves_roles(
+        self,
+        deploy_cfn_template,
+        cdk_bootstrap_resources,
+        aws_client,
+        account_id,
+        region_name,
+    ):
+        qualifier = short_uid()[:10]
+        stack_name = f"CDKToolkit-{short_uid()}"
+        bucket_name = f"cdk-{qualifier}-assets-{account_id}-{region_name}"
+        cdk_bootstrap_resources.register(stack_name, bucket_name)
+        parameters = {
+            "CloudFormationExecutionPolicies": "",
+            "FileAssetsBucketKmsKeyId": "AWS_MANAGED_KEY",
+            "PublicAccessBlockConfiguration": "true",
+            "Qualifier": qualifier,
+            "TrustedAccounts": "",
+            "TrustedAccountsForLookup": "",
+        }
+        template_directory = os.path.realpath(
+            os.path.join(os.path.dirname(__file__), "../../../templates")
+        )
+
+        created = deploy_cfn_template(
+            stack_name=stack_name,
+            template_path=os.path.join(template_directory, "cdk_bootstrap_v28.yaml"),
+            parameters=parameters,
+            max_wait=60,
+            delay_between_polls=1,
+        )
+        assert created.outputs["BootstrapVersion"] == "28"
+        assert created.outputs["BucketName"] == bucket_name
+        stack_resources = aws_client.cloudformation.describe_stack_resources(
+            StackName=created.stack_id
+        )["StackResources"]
+        role_names = {
+            resource["LogicalResourceId"]: resource["PhysicalResourceId"]
+            for resource in stack_resources
+            if resource["ResourceType"] == "AWS::IAM::Role"
+        }
+        expected_roles = {
+            "CloudFormationExecutionRole",
+            "DeploymentActionRole",
+            "FilePublishingRole",
+            "ImagePublishingRole",
+            "LookupRole",
+        }
+        assert set(role_names) == expected_roles
+
+        role_identity_before = {
+            logical_id: {
+                key: value
+                for key, value in aws_client.iam.get_role(RoleName=role_name)["Role"].items()
+                if key in {"Arn", "RoleId"}
+            }
+            for logical_id, role_name in role_names.items()
+        }
+        partition = role_identity_before["DeploymentActionRole"]["Arn"].split(":", 2)[1]
+        external_policy_arn = f"arn:{partition}:iam::aws:policy/SecurityAudit"
+        for role_name in role_names.values():
+            baseline_policies = aws_client.iam.list_attached_role_policies(RoleName=role_name)[
+                "AttachedPolicies"
+            ]
+            assert external_policy_arn not in {policy["PolicyArn"] for policy in baseline_policies}
+            cdk_bootstrap_resources.attach(role_name, external_policy_arn)
+
+        updated = deploy_cfn_template(
+            is_update=True,
+            stack_name=created.stack_id,
+            template_path=os.path.join(template_directory, "cdk_bootstrap_v32.yaml"),
+            parameters=parameters,
+            max_wait=60,
+            delay_between_polls=1,
+        )
+
+        roles_after = {
+            logical_id: aws_client.iam.get_role(RoleName=role_name)["Role"]
+            for logical_id, role_name in role_names.items()
+        }
+        role_identity_after = {
+            logical_id: {key: role[key] for key in ("Arn", "RoleId")}
+            for logical_id, role in roles_after.items()
+        }
+        attached_policies = {
+            logical_id: {
+                policy["PolicyArn"]
+                for policy in aws_client.iam.list_attached_role_policies(RoleName=role_name)[
+                    "AttachedPolicies"
+                ]
+            }
+            for logical_id, role_name in role_names.items()
+        }
+
+        assert updated.stack_id == created.stack_id
+        assert updated.outputs["BootstrapVersion"] == "32"
+        assert role_identity_after == role_identity_before
+        assert all(external_policy_arn in policies for policies in attached_policies.values())
+        assert (
+            f"arn:{partition}:iam::aws:policy/AWSCloudFormationReadOnlyAccess"
+            in attached_policies["DeploymentActionRole"]
+        )
+        for logical_id in (
+            "DeploymentActionRole",
+            "FilePublishingRole",
+            "ImagePublishingRole",
+            "LookupRole",
+        ):
+            statements = roles_after[logical_id]["AssumeRolePolicyDocument"]["Statement"]
+            assert any(
+                statement.get("Condition", {}).get("Null", {}).get("sts:ExternalId") == "true"
+                for statement in statements
+            )
+
+        deployment_policy = aws_client.iam.get_role_policy(
+            RoleName=role_names["DeploymentActionRole"],
+            PolicyName="default",
+        )["PolicyDocument"]
+        deployment_statement_ids = {
+            statement.get("Sid") for statement in deployment_policy["Statement"]
+        }
+        assert "DeployPermissions" in deployment_statement_ids
+        assert "CloudFormationPermissions" not in deployment_statement_ids
+        assert (
+            aws_client.ssm.get_parameter(Name=f"/cdk-bootstrap/{qualifier}/version")["Parameter"][
+                "Value"
+            ]
+            == "32"
+        )
 
 
 class TestCdkSampleApp:

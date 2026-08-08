@@ -655,6 +655,7 @@ def test_update_supports_cdk_bootstrap_v28_to_v32_deployment_role():
     iam.attach_role_policy.assert_called_once_with(
         RoleName="cdk-deployment-role", PolicyArn=read_only_policy
     )
+    assert '"Version"' not in iam.update_assume_role_policy.call_args.kwargs["PolicyDocument"]
     provider.create.assert_not_called()
     provider.delete.assert_not_called()
 

@@ -2,6 +2,7 @@ import contextlib
 import dataclasses
 import json
 import logging
+import math
 import os
 import re
 import textwrap
@@ -1107,6 +1108,12 @@ def deploy_cfn_template(
 
         if max_wait is None:
             max_wait = 1800 if is_aws_cloud() else 180
+        if delay_between_polls is None or delay_between_polls <= 0:
+            raise ValueError("delay_between_polls must be a positive integer")
+        waiter_config = {
+            "Delay": delay_between_polls,
+            "MaxAttempts": max(1, math.ceil(max_wait / delay_between_polls)),
+        }
 
         if template_path is not None:
             template = load_template_file(template_path)
@@ -1141,7 +1148,8 @@ def deploy_cfn_template(
 
         try:
             cfn_aws_client.cloudformation.get_waiter(WAITER_CHANGE_SET_CREATE_COMPLETE).wait(
-                ChangeSetName=change_set_id
+                ChangeSetName=change_set_id,
+                WaiterConfig=waiter_config,
             )
         except botocore.exceptions.WaiterError as e:
             change_set = cfn_aws_client.cloudformation.describe_change_set(
@@ -1157,10 +1165,7 @@ def deploy_cfn_template(
         try:
             stack_waiter.wait(
                 StackName=stack_id,
-                WaiterConfig={
-                    "Delay": delay_between_polls,
-                    "MaxAttempts": max_wait / delay_between_polls,
-                },
+                WaiterConfig=waiter_config,
             )
         except botocore.exceptions.WaiterError as e:
             raise StackDeployError(
@@ -1181,10 +1186,7 @@ def deploy_cfn_template(
             cfn_aws_client.cloudformation.delete_stack(StackName=stack_id)
             cfn_aws_client.cloudformation.get_waiter(WAITER_STACK_DELETE_COMPLETE).wait(
                 StackName=stack_id,
-                WaiterConfig={
-                    "Delay": delay_between_polls,
-                    "MaxAttempts": max_wait / delay_between_polls,
-                },
+                WaiterConfig=waiter_config,
             )
 
         state.append((stack_id, _destroy_stack))
