@@ -352,7 +352,8 @@ resource is not complete if an unimplemented update is reported as success.
 - Classify all operations by origin and fidelity.
 - Build an AWS-versus-local differential harness.
 - Introduce capability manifests and documentation provenance.
-- Version metrics ingestion and import dispatch evidence into the capability catalog.
+- Version metrics ingestion and import dispatch evidence into a separate,
+  content-addressed overlay bound to the capability catalog.
 - Establish state, clock, jobs, event bus, and backpressure contracts.
 - Implement foundational IAM and account/region isolation.
 - Add performance instrumentation and baselines.
@@ -405,6 +406,16 @@ limitations for data planes that cannot be reproduced faithfully.
 The project must make the real CDK toolkit work against local endpoints; it
 must not reimplement client-side CDK behavior.
 
+Use a thin, language-neutral launcher rather than a fork of CDK. For current
+toolkits, prefer the standard `cdk` binary with `AWS_ENDPOINT_URL` and the
+S3-specific endpoint configured; retain a `cdklocal`-compatible wrapper only
+as an adapter for version compatibility and safe defaults. The launcher must
+fail closed if configuration could target real AWS, isolate credentials and
+profiles, allowlist only intentional region variables, handle container and
+host networking, and emit its resolved endpoint/region/account in CI evidence.
+The emulator contract remains the AWS APIs, CloudFormation, and Cloud
+Assembly—not the implementation language of the CDK application.
+
 | Capability | Local responsibility and dependencies |
 |---|---|
 | `cdk synth` | No special API; synthesis remains client-side |
@@ -421,11 +432,25 @@ must not reimplement client-side CDK behavior.
 | Nested stacks | Parent/child lifecycle, S3 templates, outputs, and rollback |
 | CloudControl | CRUD over the shared resource-provider registry |
 
+CDK custom resources execute AWS-authored Lambda code that does not know about
+local endpoints. They require transparent endpoint injection/DNS inside the
+Lambda runtime, including TLS handling, and must be tested as an end-to-end
+network path. The S3 endpoint used for assets must preserve an S3-recognizable
+hostname as well as path- and virtual-host addressing. These are runtime
+compatibility features, not wrapper-only fixes.
+
 The existing scenario harness uses a `BootstraplessSynthesizer` and documents
 that CDK-generated assets are unsupported in
 [`localstack-core/localstack/testing/scenario/provisioning.py`](../localstack-core/localstack/testing/scenario/provisioning.py).
 Current tests exercise bootstrap templates but do not prove compatibility with
 the real CLI. Add black-box tests that invoke the actual `cdk` binary.
+
+The current LocalStack documentation is useful as a compatibility baseline:
+it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK
+2.177.0 or later, endpoint environment injection, and paid-plan asset
+deployment. It also warns that stack updates can leave inconsistent state.
+This fork's acceptance suite must therefore prove update/no-op/rollback and
+file/Docker assets instead of inheriting those documented limitations.
 
 Version matrix:
 
@@ -433,9 +458,18 @@ Version matrix:
 - CDK CLI minimum, pinned, and latest;
 - `aws-cdk-lib` minimum, pinned, and latest independently;
 - current bootstrap and upgrade from the preceding version;
-- TypeScript and Python as full suites;
-- Java, .NET, and Go as synth/deploy smoke tests;
+- full `init`, `synth`, deploy, update, and destroy suites for every stable
+  language binding supported by AWS CDK: TypeScript, JavaScript, Python, Java,
+  C#/.NET, and Go;
+- automatic matrix expansion when AWS promotes another language binding to
+  stable, without changing the emulator protocol;
 - Linux amd64 and arm64.
+
+The CLI and Cloud Assembly are the language-neutral compatibility boundary.
+Language suites must prove that equivalent applications produce deployable
+assemblies and identical observable AWS API behavior; a passing TypeScript
+suite cannot be used as evidence for another binding. Community or
+experimental bindings can run as advisory jobs until AWS declares them stable.
 
 Gates cover `init`, `list`, `synth`, bootstrap, assets, deploy, no-op, update,
 rollback, diff, destroy, retain, transforms, custom resources, nested stacks,
@@ -445,11 +479,37 @@ References:
 
 - [AWS CDK bootstrapping](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping.html)
 - [AWS CDK deployment](https://docs.aws.amazon.com/cdk/v2/guide/deploy.html)
+- [AWS CDK language prerequisites](https://docs.aws.amazon.com/cdk/v2/guide/prerequisites.html)
+- [AWS CDK language binding stability](https://docs.aws.amazon.com/cdk/v2/guide/versioning.html)
 - [Cloud Assembly Schema](https://docs.aws.amazon.com/cdk/api/v2/python/aws_cdk.cloud_assembly_schema/README.html)
 - [LocalStack CDK integration documentation](https://docs.localstack.cloud/aws/connecting/infrastructure-as-code/aws-cdk/)
+- [LocalStack `lstk cdk` launcher documentation](https://docs.localstack.cloud/aws/developer-tools/running-localstack/lstk/#cdk)
+- [LocalStack transparent endpoint injection](https://docs.localstack.cloud/aws/configuration/networking/transparent-endpoint-injection/)
 
 Client-side construct trees, jsii, synthesis, asset hashing, Docker builds,
 `cdk.context.json`, CLI prompts, and the watch loop do not need emulation.
+
+The first metrics importer is intentionally informational. Legacy metric CSVs
+do not contain the final pytest/JUnit outcome, distinguish subject calls from
+setup, polling, and cleanup, or attest that a snapshot comparison succeeded.
+The `aws_validated` column records marker presence only. Consequently, an
+observed native dispatch can identify a candidate for deeper validation but
+cannot promote an operation to `native` or `parity-pass`.
+
+Promotion requires a versioned scenario manifest and a versioned metrics
+contract containing run ID, target, test outcome, snapshot outcome, evidence
+scope, scenario ID, selected provider, source commit, catalog digests, and a
+stable request sequence. The promotion gate must pair the local result with
+JUnit and fresh AWS evidence, reject reruns, xfail/xpass, skipped snapshot
+paths, teardown failures, missing scenarios, and conflicting provider traces.
+
+For CDK, create that manifest before adding the CLI dependency. Pin Node, the
+CDK CLI, `aws-cdk-lib`, the Cloud Assembly schema, and the emitted bootstrap
+template independently. The first black-box gate is real `synth` and
+`bootstrap --show-template`; bootstrap create/no-op/destroy follows once
+CloudFormation, S3, IAM, STS, and SSM evidence is eligible. File assets follow
+those gates, while Docker assets remain blocked until ECR exists. Adding the
+CDK CLI or another project dependency still requires explicit approval.
 
 ## 10. Documentation ingestion and freshness
 
