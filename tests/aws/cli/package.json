@@ -1,0 +1,11 @@
+{
+  "name": "localstack-cdk-cli-blackbox",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": "22.23.2"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.1135.1"
+  }
+}

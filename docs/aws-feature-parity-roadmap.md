@@ -468,6 +468,14 @@ and strict cleanup of the retained bucket. This promotes only the bootstrap
 engine/API scenario to `api-simulated`; real CLI and fresh AWS differential
 evidence remain required.
 
+The first real-CLI gate is now defined as the language-neutral
+`bootstrap --show-template` scenario with Node 22.23.2 and `aws-cdk` 2.1135.1
+locked under `tests/aws/cli/`. It compares the emitted template semantically
+with the byte-pinned official v32 template while bounding runtime and captured
+output. Until the required Linux amd64 and arm64 lanes run with enforced
+external egress denial, it remains diagnostic infrastructure: it does not set
+`real_cli_exercised`, remove `bootstrap-cli-not-run`, or promote any language.
+
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK
 2.177.0 or later, endpoint environment injection, and paid-plan asset

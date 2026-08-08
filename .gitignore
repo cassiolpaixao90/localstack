@@ -18,6 +18,7 @@ localstack/infra/
 
 /node_modules/
 package-lock.json
+!tests/aws/cli/package-lock.json
 /nosetests.xml
 
 .env
