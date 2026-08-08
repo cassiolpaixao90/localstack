@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "manifest_sha256": "sha256:954deaebca3f7272ae535f80dce47710c8233746cdf86c5cea7051d26e483bf5",
+  "manifest_sha256": "sha256:1d541ce326e29f751de38d11fae1bce60a50c2285ca9ce5ae0546c374b5acf45",
   "scope": "planning-baseline",
   "sources": [
     {
@@ -87,7 +87,7 @@
       "detached_descendants": "not-contained"
     },
     "environment": ["AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3", "AWS_REGION", "CDK_DEFAULT_ACCOUNT", "CDK_DEFAULT_REGION"],
-    "safety": ["bounded-output", "fail-closed-no-aws-fallback", "process-group-timeout", "reject-public-aws-endpoints", "strip-parent-aws-credentials"]
+    "safety": ["bounded-capture-memory", "bounded-health-preflight", "default-version-gate", "fail-closed-no-aws-fallback", "live-output", "no-proxy-or-redirect-preflight", "process-group-timeout", "reject-public-aws-endpoints", "strip-parent-aws-credentials"]
   },
   "current_evidence": {
     "construct_language": "python",
@@ -96,10 +96,13 @@
     "freshness": "stale",
     "critical_snapshot_exclusions": true,
     "local_paths": [
+      "localstack-core/localstack/cli/_cdk_health_probe.py",
+      "localstack-core/localstack/cli/cdk.py",
       "localstack-core/localstack/testing/scenario/provisioning.py",
       "requirements-test.txt",
       "tests/aws/services/cloudformation/resources/test_cdk.py",
-      "tests/aws/services/cloudformation/resources/test_cdk.validation.json"
+      "tests/aws/services/cloudformation/resources/test_cdk.validation.json",
+      "tests/unit/cli/test_cdk.py"
     ]
   },
   "capabilities": [

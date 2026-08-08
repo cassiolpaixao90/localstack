@@ -71,10 +71,29 @@ platform, and scenario tuple; never replace that matrix with a global
 `cdk_supported` boolean.
 
 The launcher treats the standard CDK CLI as trusted code and supervises one
-POSIX process group. It bounds output and runtime but is not a sandbox: a child
-that deliberately starts a detached session is outside this boundary. Stronger
-containment requires a separately validated cgroup v2 or Windows Job Object
-adapter.
+POSIX process group. It bounds retained capture and runtime but is not a
+sandbox: a child that deliberately starts a detached session is outside this
+boundary. Stronger containment requires a separately validated cgroup v2 or
+Windows Job Object adapter.
+
+The executable adapter is available as
+`PYTHONPATH=localstack-core python -m localstack.cli.cdk [launcher options]
+<cdk-command> [cdk-options]`. Launcher options must precede the CDK command;
+all later arguments are forwarded literally. Explicit flags override
+`LSTK_CDK_CMD`, `AWS_ENDPOINT_URL`, `AWS_ENDPOINT_URL_S3`, and `AWS_REGION`.
+By default it verifies a bounded LocalStack health response and a stable CDK
+CLI version of at least 2.177.0, inherits stdout/stderr directly, and inherits
+stdin only when attached to a terminal. Capture memory is bounded for probes
+and non-file test streams; bytes emitted by the child are intentionally not
+bounded. `--unsafe-skip-version-check` is a diagnostic
+escape hatch, not evidence of compatibility. The preflight and sentinel AWS
+credentials reduce accidental AWS access but do not replace an external
+network-egress policy for untrusted CDK applications.
+
+The health request runs in a short-lived stdlib-only helper selected by
+absolute path with isolated Python flags and a minimal environment. This keeps
+the total deadline enforceable without inheriting AWS credentials, proxy
+settings, Python import paths, or a persistent multiprocessing tracker.
 
 The static provider inventory covers the providers declared by this checkout.
 Static classifications use the provider registered as `default`; the JSON also

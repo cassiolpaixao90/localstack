@@ -1,10 +1,12 @@
 import ipaddress
+import json
 import math
 import os
 import re
 import selectors
 import signal
 import subprocess
+import sys
 import threading
 import time
 from collections.abc import Collection, Iterable, Mapping, Sequence
@@ -12,6 +14,8 @@ from dataclasses import dataclass
 from os import PathLike
 from typing import BinaryIO
 from urllib.parse import urlsplit
+
+import click
 
 from localstack.constants import AWS_REGION_US_EAST_1, DEFAULT_AWS_ACCOUNT_ID
 
@@ -57,11 +61,24 @@ _AWS_PUBLIC_DOMAINS = (
 )
 _TERMINATION_GRACE_SECONDS = 0.5
 MAX_CDK_TIMEOUT_SECONDS = 24 * 60 * 60
-MAX_CDK_OUTPUT_BYTES = 64 * 1024 * 1024
+MAX_CDK_CAPTURE_BYTES = 64 * 1024 * 1024
+MAX_PREFLIGHT_TIMEOUT_SECONDS = 10
+_MAX_HEALTH_RESPONSE_BYTES = 64 * 1024
+_DEFAULT_ENDPOINT_URL = "http://localhost.localstack.cloud:4566"
+_MINIMUM_CDK_CLI_VERSION = (2, 177, 0)
+_MINIMUM_CDK_CLI_VERSION_TEXT = ".".join(str(part) for part in _MINIMUM_CDK_CLI_VERSION)
+_HEALTH_PROBE_LOCK = threading.Lock()
+_HEALTH_HELPER_ENVIRONMENT = frozenset({"LANG", "LC_ALL", "SYSTEMROOT", "TEMP", "TMP", "TMPDIR"})
 
 
 class CdkLauncherError(ValueError):
     """Raised when CDK could escape the configured local environment."""
+
+
+class CdkExecutableError(CdkLauncherError):
+    def __init__(self, result: "CdkLaunchResult"):
+        super().__init__("CDK executable could not be started")
+        self.result = result
 
 
 @dataclass(frozen=True)
@@ -184,6 +201,106 @@ def build_cdk_environment(
     return environment
 
 
+def probe_localstack_health(
+    endpoint_url: str,
+    *,
+    timeout_seconds: float = 2,
+    allowed_remote_hosts: Collection[str] = (),
+) -> dict:
+    """Verify a bounded health response without proxies or redirects."""
+    endpoint_url = validate_local_endpoint(endpoint_url, allowed_remote_hosts=allowed_remote_hosts)
+    if (
+        isinstance(timeout_seconds, bool)
+        or not isinstance(timeout_seconds, (int, float))
+        or timeout_seconds <= 0
+        or timeout_seconds > MAX_PREFLIGHT_TIMEOUT_SECONDS
+        or not math.isfinite(timeout_seconds)
+    ):
+        raise CdkLauncherError(
+            "preflight timeout must be greater than 0 "
+            f"and at most {MAX_PREFLIGHT_TIMEOUT_SECONDS} seconds"
+        )
+
+    deadline = time.monotonic() + timeout_seconds
+    remaining = max(0, deadline - time.monotonic())
+    if not _HEALTH_PROBE_LOCK.acquire(timeout=remaining):
+        raise CdkLauncherError("preflight failed: total deadline exceeded")
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        try:
+            helper_path = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "_cdk_health_probe.py")
+            )
+            helper_environment = {
+                name: value
+                for name, value in os.environ.items()
+                if name in _HEALTH_HELPER_ENVIRONMENT
+            }
+            helper_environment["PYTHONIOENCODING"] = "utf-8"
+            process = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-I",
+                    "-S",
+                    helper_path,
+                    endpoint_url,
+                ],
+                cwd=os.path.dirname(helper_path),
+                env=helper_environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        except OSError as error:
+            raise CdkLauncherError(f"preflight failed: {error}") from None
+
+        remaining = max(0, deadline - time.monotonic())
+        try:
+            output, _ = process.communicate(timeout=remaining)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+            raise CdkLauncherError("preflight failed: total deadline exceeded")
+        if time.monotonic() > deadline:
+            raise CdkLauncherError("preflight failed: total deadline exceeded")
+    finally:
+        if process is not None and process.poll() is None:
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            try:
+                process.communicate(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.communicate()
+        _HEALTH_PROBE_LOCK.release()
+
+    if process.returncode or not output:
+        raise CdkLauncherError("preflight failed: health helper exited unexpectedly")
+    kind, body = output[:1], output[1:]
+    if kind == b"E":
+        raise CdkLauncherError(f"preflight failed: {body.decode(errors='replace')}") from None
+    if kind != b"O":
+        raise CdkLauncherError("preflight failed: invalid health helper response")
+
+    if len(body) > _MAX_HEALTH_RESPONSE_BYTES:
+        raise CdkLauncherError("preflight failed: health response exceeds 65536 bytes")
+    try:
+        health = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise CdkLauncherError("preflight failed: health response is not valid JSON") from error
+    if (
+        not isinstance(health, dict)
+        or not isinstance(health.get("services"), dict)
+        or not isinstance(health.get("version"), str)
+        or not health["version"]
+    ):
+        raise CdkLauncherError("preflight failed: endpoint did not identify as LocalStack")
+    return health
+
+
 def launch_cdk(
     arguments: Sequence[str],
     *,
@@ -192,8 +309,11 @@ def launch_cdk(
     cwd: str | PathLike[str] | None = None,
     timeout_seconds: float = 30 * 60,
     max_output_bytes: int = 1024 * 1024,
+    stdin: BinaryIO | int | None = subprocess.DEVNULL,
+    stdout: BinaryIO | int | None = subprocess.PIPE,
+    stderr: BinaryIO | int | None = subprocess.PIPE,
 ) -> CdkLaunchResult:
-    """Execute trusted CDK in a POSIX process group with bounded output and runtime."""
+    """Execute trusted CDK with bounded capture and POSIX process-group runtime."""
     if os.name != "posix":
         raise CdkLauncherError("safe CDK process supervision is not available on this platform")
     if not executable or not isinstance(executable, str):
@@ -216,10 +336,10 @@ def launch_cdk(
         isinstance(max_output_bytes, bool)
         or not isinstance(max_output_bytes, int)
         or max_output_bytes < 0
-        or max_output_bytes > MAX_CDK_OUTPUT_BYTES
+        or max_output_bytes > MAX_CDK_CAPTURE_BYTES
     ):
         raise CdkLauncherError(
-            f"CDK output limit must be an integer from 0 to {MAX_CDK_OUTPUT_BYTES} bytes"
+            f"CDK capture limit must be an integer from 0 to {MAX_CDK_CAPTURE_BYTES} bytes"
         )
 
     stdout_capture = _BoundedCapture(max_output_bytes)
@@ -227,9 +347,9 @@ def launch_cdk(
     popen_options = {
         "cwd": cwd,
         "env": dict(environment),
-        "stdin": subprocess.DEVNULL,
-        "stdout": subprocess.PIPE,
-        "stderr": subprocess.PIPE,
+        "stdin": stdin,
+        "stdout": stdout,
+        "stderr": stderr,
         "start_new_session": True,
         "bufsize": 0,
     }
@@ -243,10 +363,11 @@ def launch_cdk(
         raise CdkLauncherError(f"unable to start CDK: {error}") from error
 
     stop_readers = threading.Event()
-    readers = [
-        _start_reader(process.stdout, stdout_capture, stop_readers, "cdk-stdout"),
-        _start_reader(process.stderr, stderr_capture, stop_readers, "cdk-stderr"),
-    ]
+    readers = []
+    if stdout == subprocess.PIPE:
+        readers.append(_start_reader(process.stdout, stdout_capture, stop_readers, "cdk-stdout"))
+    if stderr == subprocess.PIPE:
+        readers.append(_start_reader(process.stderr, stderr_capture, stop_readers, "cdk-stderr"))
     timed_out = threading.Event()
     stop_watchdog = threading.Event()
     watchdog = threading.Thread(
@@ -271,6 +392,39 @@ def launch_cdk(
     if timed_out.is_set():
         returncode = 124
     return _launch_result(returncode, timed_out.is_set(), stdout_capture, stderr_capture)
+
+
+def probe_cdk_cli_version(
+    executable: str,
+    *,
+    environment: Mapping[str, str],
+    cwd: str | PathLike[str] | None = None,
+) -> str:
+    """Require a CDK CLI version that honors the standard endpoint environment."""
+    result = launch_cdk(
+        ["--version"],
+        executable=executable,
+        environment=environment,
+        cwd=cwd,
+        timeout_seconds=10,
+        max_output_bytes=4096,
+    )
+    if result.returncode == 126:
+        raise CdkExecutableError(result)
+    if result.returncode:
+        raise CdkLauncherError(f"CDK version check failed with exit code {result.returncode}")
+
+    output = result.stdout.decode("utf-8", errors="replace").strip()
+    match = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)(?: \(build [^)]+\))?", output)
+    if not match:
+        raise CdkLauncherError("CDK version check returned an unrecognized version")
+    version = tuple(int(part) for part in match.groups())
+    if version < _MINIMUM_CDK_CLI_VERSION:
+        raise CdkLauncherError(
+            f"CDK CLI {_MINIMUM_CDK_CLI_VERSION_TEXT} or newer is required; "
+            f"found {'.'.join(match.groups())}"
+        )
+    return ".".join(match.groups())
 
 
 def _is_loopback(host: str) -> bool:
@@ -404,3 +558,142 @@ def _launch_result(
         stdout_truncated=stdout.truncated,
         stderr_truncated=stderr.truncated,
     )
+
+
+@click.command(
+    context_settings={
+        "allow_extra_args": True,
+        "allow_interspersed_args": False,
+        "help_option_names": ["-h", "--help"],
+        "ignore_unknown_options": True,
+    }
+)
+@click.option("--exec", "executable", envvar="LSTK_CDK_CMD", default="cdk", show_default=True)
+@click.option(
+    "--endpoint-url",
+    envvar=["AWS_ENDPOINT_URL", "LOCALSTACK_ENDPOINT_URL"],
+    default=_DEFAULT_ENDPOINT_URL,
+    show_default=True,
+)
+@click.option("--s3-endpoint-url", envvar="AWS_ENDPOINT_URL_S3")
+@click.option(
+    "--region",
+    envvar=["AWS_REGION", "AWS_DEFAULT_REGION"],
+    default=AWS_REGION_US_EAST_1,
+    show_default=True,
+)
+@click.option("--account-id", default=DEFAULT_AWS_ACCOUNT_ID, show_default=True)
+@click.option("--cwd", type=click.Path(file_okay=False, path_type=str))
+@click.option("--timeout-seconds", type=float, default=30 * 60, show_default=True)
+@click.option(
+    "--max-capture-bytes",
+    "max_output_bytes",
+    type=int,
+    default=1024 * 1024,
+    show_default=True,
+)
+@click.option("--preflight-timeout-seconds", type=float, default=2, show_default=True)
+@click.option("--allow-remote-host", multiple=True)
+@click.option("--pass-env", "pass_environment", multiple=True)
+@click.option("--preflight/--no-preflight", default=True, show_default=True)
+@click.option("--unsafe-skip-version-check", is_flag=True, default=False)
+@click.option("--interactive/--non-interactive", default=None)
+@click.argument("cdk_arguments", nargs=-1, type=click.UNPROCESSED)
+def cli(
+    executable: str,
+    endpoint_url: str,
+    s3_endpoint_url: str | None,
+    region: str,
+    account_id: str,
+    cwd: str | None,
+    timeout_seconds: float,
+    max_output_bytes: int,
+    preflight_timeout_seconds: float,
+    allow_remote_host: tuple[str, ...],
+    pass_environment: tuple[str, ...],
+    preflight: bool,
+    unsafe_skip_version_check: bool,
+    interactive: bool | None,
+    cdk_arguments: tuple[str, ...],
+) -> None:
+    """Run the standard AWS CDK CLI against LocalStack.
+
+    Launcher options precede the CDK command; everything after it is passed literally.
+    """
+    try:
+        if preflight:
+            probe_localstack_health(
+                endpoint_url,
+                timeout_seconds=preflight_timeout_seconds,
+                allowed_remote_hosts=allow_remote_host,
+            )
+        environment = build_cdk_environment(
+            os.environ,
+            endpoint_url=endpoint_url,
+            s3_endpoint_url=s3_endpoint_url,
+            region=region,
+            account_id=account_id,
+            pass_environment=pass_environment,
+            allowed_remote_hosts=allow_remote_host,
+        )
+        if not unsafe_skip_version_check:
+            probe_cdk_cli_version(executable, environment=environment, cwd=cwd)
+        stdin_stream = click.get_binary_stream("stdin")
+        stdout_stream = click.get_binary_stream("stdout")
+        stderr_stream = click.get_binary_stream("stderr")
+        if interactive is None:
+            interactive = stdin_stream.isatty()
+        if interactive and not stdin_stream.isatty():
+            raise CdkLauncherError("interactive mode requires a terminal on stdin")
+        result = launch_cdk(
+            cdk_arguments,
+            executable=executable,
+            environment=environment,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            max_output_bytes=max_output_bytes,
+            stdin=None if interactive else subprocess.DEVNULL,
+            stdout=_direct_stream_or_pipe(stdout_stream),
+            stderr=_direct_stream_or_pipe(stderr_stream),
+        )
+    except CdkExecutableError as error:
+        _emit_launch_result(error.result)
+        raise click.exceptions.Exit(126) from error
+    except CdkLauncherError as error:
+        click.echo(f"CDK launcher failed: {error}", err=True)
+        raise click.exceptions.Exit(125) from error
+
+    _emit_launch_result(result)
+    if result.returncode:
+        raise click.exceptions.Exit(result.returncode)
+
+
+def _direct_stream_or_pipe(stream: BinaryIO) -> BinaryIO | int:
+    try:
+        stream.fileno()
+    except (AttributeError, OSError):
+        return subprocess.PIPE
+    return stream
+
+
+def _emit_launch_result(result: CdkLaunchResult) -> None:
+    stdout = click.get_binary_stream("stdout")
+    stderr = click.get_binary_stream("stderr")
+    stdout.write(result.stdout)
+    stderr.write(result.stderr)
+    stdout.flush()
+    stderr.flush()
+    if result.stdout_truncated:
+        click.echo(
+            f"CDK stdout truncated after {len(result.stdout)} of {result.stdout_bytes} bytes",
+            err=True,
+        )
+    if result.stderr_truncated:
+        click.echo(
+            f"CDK stderr truncated after {len(result.stderr)} of {result.stderr_bytes} bytes",
+            err=True,
+        )
+
+
+if __name__ == "__main__":
+    cli()

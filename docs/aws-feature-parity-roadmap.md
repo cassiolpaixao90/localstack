@@ -445,6 +445,15 @@ that CDK-generated assets are unsupported in
 Current tests exercise bootstrap templates but do not prove compatibility with
 the real CLI. Add black-box tests that invoke the actual `cdk` binary.
 
+The first executable adapter lives in
+[`localstack-core/localstack/cli/cdk.py`](../localstack-core/localstack/cli/cdk.py).
+It provides a hard-deadline health preflight, rejects redirects/proxies and
+public AWS endpoints, sanitizes credentials, verifies the stable CLI version,
+inherits stdout/stderr for native streaming, bounds fallback capture memory,
+preserves interactive stdin on terminals, and supervises a POSIX process
+group. This is launcher evidence only: it does not
+promote any language or scenario until the real CLI matrix below passes.
+
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK
 2.177.0 or later, endpoint environment injection, and paid-plan asset
@@ -487,7 +496,8 @@ References:
 - [LocalStack transparent endpoint injection](https://docs.localstack.cloud/aws/configuration/networking/transparent-endpoint-injection/)
 
 Client-side construct trees, jsii, synthesis, asset hashing, Docker builds,
-`cdk.context.json`, CLI prompts, and the watch loop do not need emulation.
+`cdk.context.json`, CLI prompts, and the watch loop do not need emulation, but
+the thin launcher must preserve their normal input/output behavior.
 
 The first metrics importer is intentionally informational. Legacy metric CSVs
 do not contain the final pytest/JUnit outcome, distinguish subject calls from
