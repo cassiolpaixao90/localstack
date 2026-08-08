@@ -413,6 +413,8 @@ def create_mocking_dispatch_table(service) -> DispatchTable:
             operation=operation,
             pass_context=True,
             expand_parameters=False,
+            origin="generated-mock",
+            handler_name="localstack.aws.mocking.return_mock_response",
         )
 
     return dispatch_table

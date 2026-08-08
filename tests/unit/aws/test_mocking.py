@@ -1,5 +1,6 @@
 import pytest
 
+from localstack.aws.dispatch_trace import enable_dispatch_trace, get_dispatch_trace
 from localstack.aws.forwarder import create_aws_request_context
 from localstack.aws.mocking import generate_request, generate_response, get_mocking_skeleton
 from localstack.aws.protocol.serializer import create_serializer as create_response_serializer
@@ -56,6 +57,8 @@ def test_get_mocking_skeleton():
 
     request = {"QueueName": "my-queue-name"}
     context = create_aws_request_context("sqs", "CreateQueue", "json", request)
+    enable_dispatch_trace(context)
     response = skeleton.invoke(context)
     # just a smoke test
     assert b"QueueUrl" in response.data
+    assert get_dispatch_trace(context)[0]["origin"] == "generated-mock"

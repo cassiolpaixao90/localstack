@@ -17,6 +17,7 @@ from ..api.core import ServiceOperation
 from ..catalog_exceptions import get_service_availability_exception
 from ..chain import CompositeResponseHandler, ExceptionHandler, Handler, HandlerChain
 from ..client import parse_response, parse_service_exception
+from ..dispatch_trace import finish_dispatch, start_dispatch
 from ..protocol.parser import RequestParser, create_parser
 from ..protocol.serializer import create_serializer
 from ..protocol.service_router import determine_aws_protocol, determine_aws_service_model
@@ -111,6 +112,8 @@ class ServiceRequestRouter(Handler):
 
         handler = self.handlers.get(key)
         if not handler:
+            trace_index = start_dispatch(context, "none", "service-request-router")
+            finish_dispatch(context, trace_index, "missing")
             error = self.create_not_implemented_response(context)
             response.update_from(error)
             chain.stop()

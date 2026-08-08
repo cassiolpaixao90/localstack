@@ -13,6 +13,11 @@ from localstack.aws.api import (
 )
 from localstack.aws.api.core import ServiceRequest, ServiceRequestHandler, ServiceResponse
 from localstack.aws.catalog_exceptions import get_service_availability_exception
+from localstack.aws.dispatch_trace import (
+    DISPATCH_TRACE_CONTEXT_KEY,
+    finish_dispatch,
+    start_dispatch,
+)
 from localstack.aws.protocol.parser import create_parser
 from localstack.aws.protocol.serializer import ResponseSerializer, create_serializer
 from localstack.aws.spec import load_service
@@ -61,7 +66,10 @@ def create_dispatch_table(delegate: object) -> DispatchTable:
             try:
                 # attributes come from operation_marker in @handler wrapper
                 handlers[fn.operation] = HandlerAttributes(
-                    fn.__name__, fn.operation, fn.pass_context, fn.expand_parameters
+                    fn.__name__,
+                    fn.operation,
+                    fn.pass_context,
+                    fn.expand_parameters,
                 )
             except AttributeError:
                 pass
@@ -71,12 +79,24 @@ def create_dispatch_table(delegate: object) -> DispatchTable:
     for handler in handlers.values():
         # resolve the bound function of the delegate
         bound_function = getattr(delegate, handler.function_name)
+        owner = next(
+            (
+                cls
+                for cls in inspect.getmro(delegate.__class__)
+                if handler.function_name in cls.__dict__
+            ),
+            delegate.__class__,
+        )
         # create a dispatcher
         dispatch_table[handler.operation] = ServiceRequestDispatcher(
             bound_function,
             operation=handler.operation,
             pass_context=handler.pass_context,
             expand_parameters=handler.expand_parameters,
+            origin="generated-stub"
+            if owner.__module__.startswith("localstack.aws.api.")
+            else "native",
+            handler_name=f"{owner.__module__}.{owner.__name__}.{handler.function_name}",
         )
 
     return dispatch_table
@@ -87,6 +107,8 @@ class ServiceRequestDispatcher:
     operation: str
     expand_parameters: bool = True
     pass_context: bool = True
+    origin: str
+    handler_name: str
 
     def __init__(
         self,
@@ -94,11 +116,15 @@ class ServiceRequestDispatcher:
         operation: str,
         pass_context: bool = True,
         expand_parameters: bool = True,
+        origin: str = "unknown",
+        handler_name: str | None = None,
     ):
         self.fn = fn
         self.operation = operation
         self.pass_context = pass_context
         self.expand_parameters = expand_parameters
+        self.origin = origin
+        self.handler_name = handler_name or getattr(fn, "__qualname__", fn.__class__.__name__)
 
     def __call__(self, context: RequestContext, request: ServiceRequest) -> ServiceResponse | None:
         args = []
@@ -115,7 +141,23 @@ class ServiceRequestDispatcher:
                 kwargs = {xform_name(k): v for k, v in request.items()}
             kwargs["context"] = context
 
-        return self.fn(*args, **kwargs)
+        if context.__dict__.get(DISPATCH_TRACE_CONTEXT_KEY) is None:
+            return self.fn(*args, **kwargs)
+
+        trace_index = start_dispatch(context, self.origin, self.handler_name)
+        try:
+            result = self.fn(*args, **kwargs)
+        except NotImplementedError:
+            finish_dispatch(context, trace_index, "not-implemented")
+            raise
+        except ServiceException:
+            finish_dispatch(context, trace_index, "service-exception")
+            raise
+        except BaseException:
+            finish_dispatch(context, trace_index, "error")
+            raise
+        finish_dispatch(context, trace_index, "returned")
+        return result
 
 
 class Skeleton:
@@ -151,6 +193,8 @@ class Skeleton:
                     self.service.service_name,
                     operation.name,
                 )
+                trace_index = start_dispatch(context, "none", "dispatch-table")
+                finish_dispatch(context, trace_index, "missing")
                 raise NotImplementedError
 
             return self.dispatch_request(serializer, context, instance)

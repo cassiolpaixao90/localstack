@@ -11,6 +11,7 @@ from localstack.aws.api import (
     handler,
 )
 from localstack.aws.api.sqs import SendMessageRequest
+from localstack.aws.dispatch_trace import enable_dispatch_trace, get_dispatch_trace
 from localstack.aws.skeleton import DispatchTable, ServiceRequestDispatcher, Skeleton
 from localstack.aws.spec import load_service
 from localstack.http import Request
@@ -313,6 +314,7 @@ def test_dispatch_missing_method_returns_internal_failure(aws_catalog_mock):
     context.account = "test"
     context.region = "us-west-1"
     context.service = sqs_service
+    enable_dispatch_trace(context)
 
     result = skeleton.invoke(context)
     # Use the parser from botocore to parse the serialized response
@@ -327,6 +329,9 @@ def test_dispatch_missing_method_returns_internal_failure(aws_catalog_mock):
             "Sorry, the DeleteQueue operation on the sqs service is not currently supported by LocalStack."
         ),
     }
+    assert get_dispatch_trace(context) == [
+        {"origin": "none", "handler": "dispatch-table", "outcome": "missing"}
+    ]
 
 
 class TestServiceRequestDispatcher:

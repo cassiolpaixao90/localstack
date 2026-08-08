@@ -1,4 +1,5 @@
 import csv
+import json
 import logging
 import os
 from datetime import datetime
@@ -7,6 +8,7 @@ from pathlib import Path
 from localstack import config
 from localstack.aws.api import RequestContext
 from localstack.aws.chain import HandlerChain
+from localstack.aws.dispatch_trace import enable_dispatch_trace, get_dispatch_trace
 from localstack.constants import ENV_INTERNAL_TEST_STORE_METRICS_PATH
 from localstack.http import Response
 from localstack.utils.strings import short_uid
@@ -47,6 +49,7 @@ class Metric:
     aws_validated: bool
     snapshot: bool
     node_id: str
+    dispatch_trace: str
 
     RAW_DATA_HEADER = [
         "service",
@@ -62,6 +65,7 @@ class Metric:
         "aws_validated",
         "snapshot",
         "snapshot_skipped_paths",
+        "dispatch_trace",
     ]
 
     def __init__(
@@ -79,6 +83,7 @@ class Metric:
         aws_validated: bool = False,
         snapshot: bool = False,
         snapshot_skipped_paths: str = "",
+        dispatch_trace: str = "",
     ) -> None:
         self.service = service
         self.operation = operation
@@ -93,6 +98,7 @@ class Metric:
         self.aws_validated = aws_validated
         self.snapshot = snapshot
         self.snapshot_skipped_paths = snapshot_skipped_paths
+        self.dispatch_trace = dispatch_trace
 
     def __iter__(self):
         return iter(
@@ -110,6 +116,7 @@ class Metric:
                 self.aws_validated,
                 self.snapshot,
                 self.snapshot_skipped_paths,
+                self.dispatch_trace,
             ]
         )
 
@@ -134,6 +141,8 @@ class Metric:
         if self.aws_validated != other.aws_validated:
             return False
         if self.node_id != other.node_id:
+            return False
+        if self.dispatch_trace != other.dispatch_trace:
             return False
         return True
 
@@ -175,6 +184,7 @@ class MetricHandler:
     ):
         if not config.is_collect_metrics_mode():
             return
+        enable_dispatch_trace(context)
         item = MetricHandlerItem(context)
         self.metrics_handler_items[context] = item
 
@@ -202,10 +212,12 @@ class MetricHandler:
     def update_metric_collection(
         self, chain: HandlerChain, context: RequestContext, response: Response
     ):
-        if not config.is_collect_metrics_mode() or not context.service_operation:
+        item = self.metrics_handler_items.pop(context, None)
+        if not config.is_collect_metrics_mode():
             return
 
-        item = self._get_metric_handler_item_for_context(context)
+        if item is None or not context.service_operation:
+            return
 
         # parameters might get changed when dispatched to the service - we use the params stored in
         # parameters_after_parse
@@ -223,13 +235,11 @@ class MetricHandler:
             if context.service_exception
             else "",
             origin="internal" if context.is_internal_call else "external",
+            dispatch_trace=json.dumps(get_dispatch_trace(context) or [], separators=(",", ":")),
         )
         # refrain from adding duplicates
         if metric not in MetricHandler.metric_data:
             self.append_metric(metric)
-
-        # cleanup
-        del self.metrics_handler_items[context]
 
     def append_metric(self, metric: Metric):
         if self.should_store_metric_locally():

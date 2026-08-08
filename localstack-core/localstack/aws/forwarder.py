@@ -14,12 +14,18 @@ from werkzeug.datastructures import Headers
 
 from localstack.aws.api.core import (
     RequestContext,
+    ServiceException,
     ServiceRequest,
     ServiceRequestHandler,
     ServiceResponse,
 )
 from localstack.aws.client import create_http_request, parse_response, raise_service_exception
 from localstack.aws.connect import connect_to
+from localstack.aws.dispatch_trace import (
+    DISPATCH_TRACE_CONTEXT_KEY,
+    finish_dispatch,
+    start_dispatch,
+)
 from localstack.aws.skeleton import DispatchTable, create_dispatch_table
 from localstack.aws.spec import ProtocolName, load_service
 from localstack.constants import AWS_REGION_US_EAST_1
@@ -104,7 +110,9 @@ class AwsRequestProxy:
 
 
 def ForwardingFallbackDispatcher(
-    provider: object, request_forwarder: ServiceRequestHandler
+    provider: object,
+    request_forwarder: ServiceRequestHandler,
+    fallback_origin: str = "external",
 ) -> DispatchTable:
     """
     Wraps a provider with a request forwarder. It does by creating a new DispatchTable from the original
@@ -118,7 +126,7 @@ def ForwardingFallbackDispatcher(
     table = create_dispatch_table(provider)
 
     for op, fn in table.items():
-        table[op] = _wrap_with_fallthrough(fn, request_forwarder)
+        table[op] = _wrap_with_fallthrough(fn, request_forwarder, fallback_origin)
 
     return table
 
@@ -128,7 +136,9 @@ class NotImplementedAvoidFallbackError(NotImplementedError):
 
 
 def _wrap_with_fallthrough(
-    handler: ServiceRequestHandler, fallthrough_handler: ServiceRequestHandler
+    handler: ServiceRequestHandler,
+    fallthrough_handler: ServiceRequestHandler,
+    fallback_origin: str,
 ) -> ServiceRequestHandler:
     def _call(context, req) -> ServiceResponse:
         try:
@@ -141,13 +151,34 @@ def _wrap_with_fallthrough(
         except NotImplementedError:
             pass
 
-        return fallthrough_handler(context, req)
+        handler_name = getattr(
+            fallthrough_handler, "__name__", fallthrough_handler.__class__.__name__
+        )
+        if context.__dict__.get(DISPATCH_TRACE_CONTEXT_KEY) is None:
+            return fallthrough_handler(context, req)
+
+        trace_index = start_dispatch(context, f"delegated:{fallback_origin}", handler_name)
+        try:
+            result = fallthrough_handler(context, req)
+        except NotImplementedError:
+            finish_dispatch(context, trace_index, "not-implemented")
+            raise
+        except ServiceException:
+            finish_dispatch(context, trace_index, "service-exception")
+            raise
+        except BaseException:
+            finish_dispatch(context, trace_index, "error")
+            raise
+        finish_dispatch(context, trace_index, "returned")
+        return result
 
     return _call
 
 
 def HttpFallbackDispatcher(provider: object, forward_url_getter: Callable[[str, str], str]):
-    return ForwardingFallbackDispatcher(provider, get_request_forwarder_http(forward_url_getter))
+    return ForwardingFallbackDispatcher(
+        provider, get_request_forwarder_http(forward_url_getter), fallback_origin="http"
+    )
 
 
 def get_request_forwarder_http(

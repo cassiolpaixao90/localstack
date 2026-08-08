@@ -18,8 +18,15 @@ from localstack import constants
 from localstack.aws.api import (
     CommonServiceException,
     RequestContext,
+    ServiceException,
     ServiceRequest,
     ServiceResponse,
+)
+from localstack.aws.dispatch_trace import (
+    DISPATCH_TRACE_CONTEXT_KEY,
+    finish_dispatch,
+    share_dispatch_trace,
+    start_dispatch,
 )
 from localstack.aws.forwarder import (
     ForwardingFallbackDispatcher,
@@ -45,7 +52,28 @@ def call_moto(context: RequestContext, include_response_metadata=False) -> Servi
     :param include_response_metadata: whether to include botocore's "ResponseMetadata" attribute
     :return: a serialized AWS ServiceResponse (same as boto3 would return)
     """
-    return dispatch_to_backend(context, dispatch_to_moto, include_response_metadata)
+    if context.__dict__.get(DISPATCH_TRACE_CONTEXT_KEY) is None:
+        return dispatch_to_backend(context, dispatch_to_moto, include_response_metadata)
+
+    trace_index = start_dispatch(
+        context,
+        "delegated:moto",
+        "call_moto",
+        deduplicate_active_origin=True,
+    )
+    try:
+        result = dispatch_to_backend(context, dispatch_to_moto, include_response_metadata)
+    except NotImplementedError:
+        finish_dispatch(context, trace_index, "not-implemented")
+        raise
+    except ServiceException:
+        finish_dispatch(context, trace_index, "service-exception")
+        raise
+    except BaseException:
+        finish_dispatch(context, trace_index, "error")
+        raise
+    finish_dispatch(context, trace_index, "returned")
+    return result
 
 
 def call_moto_with_request(
@@ -67,6 +95,7 @@ def call_moto_with_request(
         region=context.region,
         protocol=context.protocol,
     )
+    share_dispatch_trace(context, local_context)
     # we keep the headers from the original request, but override them with the ones created from the `service_request`
     headers = copy.deepcopy(context.request.headers)
     headers.update(local_context.request.headers)
@@ -97,7 +126,7 @@ def MotoFallbackDispatcher(provider: object) -> DispatchTable:
     :param provider: the ASF provider
     :return: a modified DispatchTable
     """
-    return ForwardingFallbackDispatcher(provider, _proxy_moto)
+    return ForwardingFallbackDispatcher(provider, _proxy_moto, fallback_origin="moto")
 
 
 def dispatch_to_moto(context: RequestContext) -> Response:
