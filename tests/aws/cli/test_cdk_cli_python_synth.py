@@ -200,6 +200,13 @@ def _python_app_command(python: Path, app: Path) -> str:
     return shlex.join((str(python), "-I", "-B", str(app)))
 
 
+def _python_interpreter_path(executable: str) -> Path:
+    python = Path(executable)
+    if not python.is_absolute() or not python.is_file():
+        raise ValueError("the current Python interpreter must be an absolute regular file")
+    return python
+
+
 @pytest.fixture
 def python_synth_output(tmp_path):
     output = tmp_path / "assembly"
@@ -224,7 +231,7 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
         else:
             _require(actual == expected, f"{distribution} {expected} is required")
 
-    python = Path(sys.executable).resolve()
+    python = _python_interpreter_path(sys.executable)
     app = APP_PATH.resolve()
     app_command = _python_app_command(python, app)
     environment = dict(pinned_cdk_cli_runtime.environment)

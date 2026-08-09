@@ -22,6 +22,7 @@ from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import (
 from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import (
     _validate_required_target as _validate_bootstrap_upgrade_target,
 )
+from tests.aws.cli.test_cdk_cli_python_synth import _python_interpreter_path
 from tests.aws.cli.validate_junit import EXPECTED_TESTS, MAX_JUNIT_BYTES, validate_junit
 
 PROJECT_ROOT = Path(__file__).parents[3]
@@ -246,6 +247,16 @@ def test_cdk_python_synth_diagnostic_is_separate_and_closed():
     assert "test-results-cdk-bootstrap-upgrade-" not in diagnostic["with"]["name"]
     assert diagnostic["with"]["if-no-files-found"] == "error"
     assert "pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml" in diagnostic["with"]["path"]
+
+
+def test_cdk_python_synth_preserves_the_virtualenv_interpreter_path(tmp_path):
+    interpreter = tmp_path / "python-base"
+    interpreter.write_bytes(b"")
+    virtualenv_interpreter = tmp_path / "venv" / "bin" / "python"
+    virtualenv_interpreter.parent.mkdir(parents=True)
+    virtualenv_interpreter.symlink_to(interpreter)
+
+    assert _python_interpreter_path(str(virtualenv_interpreter)) == virtualenv_interpreter
 
 
 def test_required_cdk_cli_gate_rejects_external_network_interfaces():
