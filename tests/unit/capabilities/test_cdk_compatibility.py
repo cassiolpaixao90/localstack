@@ -1,8 +1,12 @@
+import base64
+import copy
 import hashlib
 import json
 from pathlib import Path
 
+import pytest
 import yaml
+from jsonschema.exceptions import ValidationError
 
 PROJECT_ROOT = Path(__file__).parents[3]
 MANIFEST_PATH = PROJECT_ROOT / "capabilities/cdk/compatibility.json"
@@ -36,6 +40,17 @@ def test_cdk_compatibility_manifest_matches_closed_schema():
     validator.check_schema(schema)
     validator(schema, format_checker=validator.FORMAT_CHECKER).validate(manifest)
 
+    for mutation in (
+        lambda value: value["current_evidence"].update(real_cli_exercised=False),
+        lambda value: value["current_evidence"].update(real_cli_scenario_ids=[]),
+        lambda value: value["execution_scenarios"][0].update(artifact_path="../../etc/passwd"),
+        lambda value: value["execution_scenarios"][0].update(attestation_path="/etc/passwd"),
+    ):
+        invalid = copy.deepcopy(manifest)
+        mutation(invalid)
+        with pytest.raises(ValidationError):
+            validator(schema, format_checker=validator.FORMAT_CHECKER).validate(invalid)
+
 
 def test_cdk_compatibility_manifest_requires_every_stable_binding():
     manifest = _load(MANIFEST_PATH)
@@ -53,6 +68,7 @@ def test_cdk_manifest_identity_collections_are_unique_and_ordered():
     for collection, key in (
         (manifest["sources"], "id"),
         (manifest["languages"], "id"),
+        (manifest["execution_scenarios"], "id"),
         (manifest["capabilities"], "id"),
     ):
         values = [entry[key] for entry in collection]
@@ -70,19 +86,144 @@ def test_cdk_manifest_identity_collections_are_unique_and_ordered():
     assert len(paths) == len(set(paths))
 
 
-def test_cdk_compatibility_manifest_does_not_overclaim_current_cli_support():
+def test_cdk_compatibility_manifest_promotes_only_the_language_neutral_cli_scenario():
     manifest = _load(MANIFEST_PATH)
     forbidden = {"cli-pass", "parity-pass"}
 
-    assert manifest["current_evidence"]["real_cli_exercised"] is False
+    assert manifest["current_evidence"]["real_cli_exercised"] is True
+    assert manifest["current_evidence"]["api_construct_language"] == "python"
+    assert manifest["current_evidence"]["real_cli_scenario_ids"] == ["bootstrap-show-template-v32"]
+    assert manifest["current_evidence"]["real_cli_scenario_ids"] == [
+        scenario["id"] for scenario in manifest["execution_scenarios"]
+    ]
     assert manifest["current_evidence"]["cloud_assembly_produced"] is False
     assert manifest["toolchain"]["cdk_cli"] == {
         "minimum": None,
-        "pinned": None,
-        "tested": [],
+        "pinned": "2.1135.1",
+        "tested": ["2.1135.1"],
+    }
+    assert manifest["toolchain"]["node"] == {
+        "minimum": "22.0.0",
+        "pinned": "22.23.2",
+        "tested": ["22.23.2"],
     }
     assert not forbidden.intersection(
         capability["status"] for capability in manifest["capabilities"]
+    )
+    bootstrap = next(
+        capability for capability in manifest["capabilities"] if capability["id"] == "bootstrap"
+    )
+    assert bootstrap["status"] == "api-simulated"
+    assert bootstrap["languages"] == []
+    assert bootstrap["gaps"] == ["bootstrap-deployment-cli-not-run", "validation-stale"]
+
+
+def test_cdk_cli_execution_scenario_is_content_addressed_and_attested():
+    from jsonschema.validators import validator_for
+    from tests.aws.cli.execution_evidence import read_regular_bounded, validate_aggregate_evidence
+
+    manifest = _load(MANIFEST_PATH)
+    scenario = manifest["execution_scenarios"][0]
+    for field in ("artifact_path", "attestation_path"):
+        path = Path(scenario[field])
+        assert not path.is_absolute() and ".." not in path.parts
+        assert path.parent.name == str(scenario["run_id"])
+    evidence_path = PROJECT_ROOT / scenario["artifact_path"]
+    attestation_path = PROJECT_ROOT / scenario["attestation_path"]
+    evidence_bytes = read_regular_bounded(evidence_path, 64 * 1024)
+    attestation_bytes = read_regular_bounded(attestation_path, 64 * 1024)
+    try:
+        evidence = json.loads(evidence_bytes)
+        attestation = json.loads(attestation_bytes)
+    except (UnicodeDecodeError, ValueError, RecursionError) as error:
+        raise AssertionError("retained CDK evidence is not bounded valid JSON") from error
+    assert set(evidence_path.parent.iterdir()) == {evidence_path, attestation_path}
+
+    schema = _load(PROJECT_ROOT / "capabilities/cdk/execution-evidence.schema.json")
+    validator = validator_for(schema)
+    validator.check_schema(schema)
+    validator(schema, format_checker=validator.FORMAT_CHECKER).validate(evidence)
+    validate_aggregate_evidence(evidence)
+
+    assert scenario == {
+        "id": "bootstrap-show-template-v32",
+        "status": "cli-pass",
+        "construct_language": None,
+        "platforms": ["linux-amd64", "linux-arm64"],
+        "source_commit": "1a23acd9b65fef0ef5a944bd4b412f9af9348665",
+        "run_id": 31288954038,
+        "run_attempt": 1,
+        "artifact_path": (
+            "capabilities/cdk/evidence/runs/31288954038/cdk-cli-execution-evidence.json"
+        ),
+        "artifact_sha256": (
+            "sha256:3f54ed02dcd2fcd7518e9cfe40385677e7b6664997da6ad3d119f4671ac2ac18"
+        ),
+        "evidence_id": "sha256:409f6047952330a1467384f8eafaa173408b841cf6671e2cc3811ed02fb7df65",
+        "claim_id": "sha256:cf49ba326023570fa74504ca8afba4771809b77534e57dedebf54bdb7d26308a",
+        "attestation_path": (
+            "capabilities/cdk/evidence/runs/31288954038/cdk-cli-execution-evidence.sigstore.json"
+        ),
+        "attestation_sha256": (
+            "sha256:e91102cd43e17d55a12bc3ed4df8dd3575a8ad1ca2390cacbb6342876972900e"
+        ),
+        "toolchain": {"node": "22.23.2", "cdk_cli": "2.1135.1", "bootstrap": 32},
+        "limitations": [
+            "no-bootstrap-deploy",
+            "no-cloud-assembly",
+            "no-language-binding",
+            "no-aws-differential",
+        ],
+    }
+    assert scenario["artifact_sha256"] == f"sha256:{hashlib.sha256(evidence_bytes).hexdigest()}"
+    assert scenario["attestation_sha256"] == (
+        f"sha256:{hashlib.sha256(attestation_bytes).hexdigest()}"
+    )
+    assert evidence["evidence_id"] == scenario["evidence_id"]
+    assert evidence["claim_id"] == scenario["claim_id"]
+    assert evidence["subject"]["commit_sha"] == scenario["source_commit"]
+    assert evidence["run"]["run_id"] == scenario["run_id"]
+    assert evidence["run"]["run_attempt"] == scenario["run_attempt"]
+    assert evidence["toolchain"]["node_version"] == scenario["toolchain"]["node"]
+    assert evidence["toolchain"]["cdk_cli_version"] == scenario["toolchain"]["cdk_cli"]
+    assert evidence["toolchain"]["bootstrap_version"] == scenario["toolchain"]["bootstrap"]
+
+    envelope = attestation["dsseEnvelope"]
+    assert len(envelope["signatures"]) == 1
+    assert len(attestation["verificationMaterial"]["tlogEntries"]) == 1
+    assert (
+        len(attestation["verificationMaterial"]["tlogEntries"][0]["inclusionProof"]["hashes"]) <= 64
+    )
+    decoded_payload = base64.b64decode(envelope["payload"], validate=True)
+    assert len(decoded_payload) <= 16 * 1024
+    statement = json.loads(decoded_payload)
+    assert statement["subject"] == [
+        {
+            "name": "cdk-cli-execution-evidence.json",
+            "digest": {"sha256": scenario["artifact_sha256"].removeprefix("sha256:")},
+        }
+    ]
+    assert statement["predicateType"] == "https://slsa.dev/provenance/v1"
+    definition = statement["predicate"]["buildDefinition"]
+    assert definition["externalParameters"]["workflow"] == {
+        "ref": "refs/heads/main",
+        "repository": "https://github.com/cassiolpaixao90/localstack",
+        "path": ".github/workflows/cdk-cli-blackbox.yml",
+    }
+    assert definition["resolvedDependencies"] == [
+        {
+            "uri": "git+https://github.com/cassiolpaixao90/localstack@refs/heads/main",
+            "digest": {"gitCommit": scenario["source_commit"]},
+        }
+    ]
+    predicate = statement["predicate"]
+    assert predicate["buildDefinition"]["internalParameters"]["github"]["event_name"] == "push"
+    assert (
+        predicate["buildDefinition"]["internalParameters"]["github"]["runner_environment"]
+        == "github-hosted"
+    )
+    assert predicate["runDetails"]["metadata"]["invocationId"] == (
+        "https://github.com/cassiolpaixao90/localstack/actions/runs/31288954038/attempts/1"
     )
 
 

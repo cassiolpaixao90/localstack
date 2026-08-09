@@ -278,7 +278,7 @@ def create_lane_receipt(
     return _validate_lane_receipt(receipt)
 
 
-def _read_regular_bounded(path: Path, maximum: int) -> bytes:
+def read_regular_bounded(path: Path, maximum: int) -> bytes:
     flags = os.O_RDONLY
     for name in ("O_BINARY", "O_CLOEXEC", "O_NONBLOCK", "O_NOFOLLOW"):
         flags |= getattr(os, name, 0)
@@ -298,7 +298,7 @@ def _read_regular_bounded(path: Path, maximum: int) -> bytes:
 
 
 def load_bounded_json(path: Path, maximum: int = MAX_EVIDENCE_BYTES) -> dict:
-    payload = _read_regular_bounded(path, maximum)
+    payload = read_regular_bounded(path, maximum)
     try:
         value = json.loads(payload)
     except (UnicodeDecodeError, ValueError, RecursionError) as error:

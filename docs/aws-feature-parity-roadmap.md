@@ -474,10 +474,10 @@ locked under `tests/aws/cli/`. It compares the emitted template semantically
 with the byte-pinned official v32 template while bounding runtime and captured
 output. `.github/workflows/cdk-cli-blackbox.yml` defines native Linux amd64 and
 arm64 jobs whose pytest process runs without external network interfaces,
-inherited credentials, supplementary groups, or Linux capabilities. Until
-both post-merge jobs produce attestable evidence, this remains diagnostic
-infrastructure: it does not set `real_cli_exercised`, remove
-`bootstrap-cli-not-run`, or promote any language.
+inherited credentials, supplementary groups, or Linux capabilities. The gate
+remains diagnostic until both post-merge jobs produce attestable evidence; a
+test definition alone does not set `real_cli_exercised`, remove a deployment
+gap, or promote any language.
 
 The workflow's evidence contract is deliberately two-phase. A first-attempt
 push to `main` must produce content-addressed lane receipts and exactly one
@@ -490,6 +490,16 @@ commit must preserve and verify the aggregate and attestation before it may
 promote only the narrow `bootstrap-show-template-v32` subscenario. Bootstrap
 deployment, language bindings, Cloud Assembly, and AWS parity remain separate
 gates.
+
+The first cycle completed in GitHub Actions run `31288954038` for commit
+`1a23acd9b65fef0ef5a944bd4b412f9af9348665`. Both native lanes and the
+first-attempt aggregate passed, and the aggregate was verified against the
+repository, signer workflow, source commit, and `refs/heads/main` before its
+JSON and Sigstore bundle were retained in `capabilities/cdk/evidence/`. The
+manifest therefore records `bootstrap-show-template-v32` as a language-neutral
+`cli-pass` scenario with Node 22.23.2 and CDK CLI 2.1135.1. This does not change
+the broad bootstrap status or satisfy the deploy, Cloud Assembly, language, or
+AWS differential gates.
 
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK

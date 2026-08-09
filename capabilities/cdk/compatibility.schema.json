@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:localstack-fork:cdk-compatibility:v1",
-  "title": "AWS CDK compatibility planning baseline",
+  "$id": "urn:localstack-fork:cdk-compatibility:v2",
+  "title": "AWS CDK compatibility and execution evidence manifest",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,10 +14,11 @@
     "toolchain",
     "launcher",
     "current_evidence",
+    "execution_scenarios",
     "capabilities"
   ],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "manifest_sha256": {"$ref": "#/$defs/hash"},
     "scope": {"const": "planning-baseline"},
     "sources": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/source"}},
@@ -32,6 +33,13 @@
     "toolchain": {"$ref": "#/$defs/toolchain"},
     "launcher": {"$ref": "#/$defs/launcher"},
     "current_evidence": {"$ref": "#/$defs/currentEvidence"},
+    "execution_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/executionScenario"}
+    },
     "capabilities": {
       "type": "array",
       "minItems": 1,
@@ -162,20 +170,86 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "construct_language",
+        "api_construct_language",
         "real_cli_exercised",
+        "real_cli_scenario_ids",
         "cloud_assembly_produced",
         "freshness",
         "critical_snapshot_exclusions",
         "local_paths"
       ],
       "properties": {
-        "construct_language": {"const": "python"},
-        "real_cli_exercised": {"const": false},
+        "api_construct_language": {"const": "python"},
+        "real_cli_exercised": {"const": true},
+        "real_cli_scenario_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
         "cloud_assembly_produced": {"const": false},
         "freshness": {"enum": ["missing", "stale", "fresh"]},
         "critical_snapshot_exclusions": {"type": "boolean"},
         "local_paths": {"$ref": "#/$defs/stringArray"}
+      }
+    },
+    "executionScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "status",
+        "construct_language",
+        "platforms",
+        "source_commit",
+        "run_id",
+        "run_attempt",
+        "artifact_path",
+        "artifact_sha256",
+        "evidence_id",
+        "claim_id",
+        "attestation_path",
+        "attestation_sha256",
+        "toolchain",
+        "limitations"
+      ],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "status": {"const": "cli-pass"},
+        "construct_language": {"type": "null"},
+        "platforms": {
+          "type": "array",
+          "prefixItems": [{"const": "linux-amd64"}, {"const": "linux-arm64"}],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "run_id": {"type": "integer", "minimum": 1},
+        "run_attempt": {"const": 1},
+        "artifact_path": {
+          "type": "string",
+          "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-cli-execution-evidence\\.json$"
+        },
+        "artifact_sha256": {"$ref": "#/$defs/hash"},
+        "evidence_id": {"$ref": "#/$defs/hash"},
+        "claim_id": {"$ref": "#/$defs/hash"},
+        "attestation_path": {
+          "type": "string",
+          "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-cli-execution-evidence\\.sigstore\\.json$"
+        },
+        "attestation_sha256": {"$ref": "#/$defs/hash"},
+        "toolchain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node", "cdk_cli", "bootstrap"],
+          "properties": {
+            "node": {"type": "string", "minLength": 1},
+            "cdk_cli": {"type": "string", "minLength": 1},
+            "bootstrap": {"type": "integer", "minimum": 1}
+          }
+        },
+        "limitations": {"$ref": "#/$defs/stringArray"}
       }
     },
     "capability": {

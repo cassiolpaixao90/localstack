@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "manifest_sha256": "sha256:6e2d3c2546ad1ae5b0948bceb1c7d8dd132a63e2a4343e997e611dad99845eb9",
+  "schema_version": 2,
+  "manifest_sha256": "sha256:8d4fa1326530bb0907c8db20010b30dd14f40daecdd5991c067e48a5061ea057",
   "scope": "planning-baseline",
   "sources": [
     {
@@ -75,8 +75,8 @@
     {"id": "typescript", "init_value": "typescript", "official_stability": "stable", "support_gate": "required", "ecosystem": "npm", "coordinate": "aws-cdk-lib"}
   ],
   "toolchain": {
-    "node": {"minimum": "22.0.0", "pinned": null, "tested": []},
-    "cdk_cli": {"minimum": null, "pinned": null, "tested": []},
+    "node": {"minimum": "22.0.0", "pinned": "22.23.2", "tested": ["22.23.2"]},
+    "cdk_cli": {"minimum": null, "pinned": "2.1135.1", "tested": ["2.1135.1"]},
     "construct_library": {"minimum": "2.88.0", "pinned": "2.241.0", "tested": []},
     "cloud_assembly": {"minimum": null, "pinned": "52.2.0", "tested": []},
     "bootstrap": {
@@ -104,8 +104,9 @@
     "safety": ["bounded-capture-memory", "bounded-health-preflight", "default-version-gate", "fail-closed-no-aws-fallback", "live-output", "no-proxy-or-redirect-preflight", "process-group-timeout", "reject-public-aws-endpoints", "strip-parent-aws-credentials"]
   },
   "current_evidence": {
-    "construct_language": "python",
-    "real_cli_exercised": false,
+    "api_construct_language": "python",
+    "real_cli_exercised": true,
+    "real_cli_scenario_ids": ["bootstrap-show-template-v32"],
     "cloud_assembly_produced": false,
     "freshness": "stale",
     "critical_snapshot_exclusions": true,
@@ -119,8 +120,27 @@
       "tests/unit/cli/test_cdk.py"
     ]
   },
+  "execution_scenarios": [
+    {
+      "id": "bootstrap-show-template-v32",
+      "status": "cli-pass",
+      "construct_language": null,
+      "platforms": ["linux-amd64", "linux-arm64"],
+      "source_commit": "1a23acd9b65fef0ef5a944bd4b412f9af9348665",
+      "run_id": 31288954038,
+      "run_attempt": 1,
+      "artifact_path": "capabilities/cdk/evidence/runs/31288954038/cdk-cli-execution-evidence.json",
+      "artifact_sha256": "sha256:3f54ed02dcd2fcd7518e9cfe40385677e7b6664997da6ad3d119f4671ac2ac18",
+      "evidence_id": "sha256:409f6047952330a1467384f8eafaa173408b841cf6671e2cc3811ed02fb7df65",
+      "claim_id": "sha256:cf49ba326023570fa74504ca8afba4771809b77534e57dedebf54bdb7d26308a",
+      "attestation_path": "capabilities/cdk/evidence/runs/31288954038/cdk-cli-execution-evidence.sigstore.json",
+      "attestation_sha256": "sha256:e91102cd43e17d55a12bc3ed4df8dd3575a8ad1ca2390cacbb6342876972900e",
+      "toolchain": {"node": "22.23.2", "cdk_cli": "2.1135.1", "bootstrap": 32},
+      "limitations": ["no-bootstrap-deploy", "no-cloud-assembly", "no-language-binding", "no-aws-differential"]
+    }
+  ],
   "capabilities": [
-    {"id": "bootstrap", "status": "api-simulated", "languages": [], "dependencies": ["cloudformation", "ecr", "iam", "kms", "s3", "ssm", "sts"], "evidence": ["tests/aws/services/cloudformation/resources/test_cdk.py"], "gaps": ["bootstrap-cli-not-run", "validation-stale"]},
+    {"id": "bootstrap", "status": "api-simulated", "languages": [], "dependencies": ["cloudformation", "ecr", "iam", "kms", "s3", "ssm", "sts"], "evidence": ["capabilities/cdk/evidence/runs/31288954038/cdk-cli-execution-evidence.json", "tests/aws/services/cloudformation/resources/test_cdk.py"], "gaps": ["bootstrap-deployment-cli-not-run", "validation-stale"]},
     {"id": "context-lookups", "status": "untested", "languages": [], "dependencies": ["ec2", "route53", "ssm", "sts"], "evidence": [], "gaps": ["real-cli-not-run"]},
     {"id": "custom-resources", "status": "untested", "languages": [], "dependencies": ["lambda", "sns"], "evidence": [], "gaps": ["transparent-endpoint-injection-not-validated"]},
     {"id": "deploy", "status": "api-simulated", "languages": ["python"], "dependencies": ["cloudformation"], "evidence": ["localstack-core/localstack/testing/scenario/provisioning.py"], "gaps": ["real-cli-not-run"]},

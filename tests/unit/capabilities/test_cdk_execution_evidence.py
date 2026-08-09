@@ -174,6 +174,10 @@ def test_cdk_execution_evidence_runtime_limits_match_the_closed_schema():
 def test_cdk_execution_evidence_reader_rejects_oversize_and_non_regular_files(tmp_path):
     oversized = tmp_path / "oversized.json"
     oversized.write_bytes(b" " * (MAX_EVIDENCE_BYTES + 1))
+    regular = tmp_path / "regular.json"
+    regular.write_text("{}")
+    symlink = tmp_path / "record-link.json"
+    symlink.symlink_to(regular)
     fifo = tmp_path / "record.fifo"
     fifo.unlink(missing_ok=True)
     import os
@@ -184,3 +188,5 @@ def test_cdk_execution_evidence_reader_rejects_oversize_and_non_regular_files(tm
         load_bounded_json(oversized)
     with pytest.raises(ValueError, match="regular file"):
         load_bounded_json(fifo)
+    with pytest.raises(OSError):
+        load_bounded_json(symlink)

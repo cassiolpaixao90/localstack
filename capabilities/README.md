@@ -121,9 +121,9 @@ requires the exact native architecture and CLI version, and compares
 template. A local run with a different Node version may set
 `CDK_EXPECTED_NODE_VERSION` for diagnostics, but that execution is not
 promotion evidence. This gate alone does not prove bootstrap deployment,
-Cloud Assembly generation, a language binding, or AWS parity, so the
-aggregate manifest remains unchanged until both post-merge platform runs
-produce attestable evidence. Each required lane now emits a bounded,
+Cloud Assembly generation, a language binding, or AWS parity. Promotion of its
+narrow client-side scenario requires both post-merge platform runs to produce
+attestable evidence. Each required lane emits a bounded,
 content-addressed receipt only after the last assertion. The aggregator rejects
 reruns, validates the exact amd64/arm64 pair and their JUnit reports, binds all
 relevant harness inputs, and creates a candidate JSON conforming to
@@ -131,6 +131,30 @@ relevant harness inputs, and creates a candidate JSON conforming to
 the receipt remains ineligible for broad promotion because this client-side
 scenario performs no bootstrap deployment, produces no Cloud Assembly, tests
 no language binding, and contains no AWS differential result.
+
+Run `31288954038` supplied the first durable aggregate for commit
+`1a23acd9b65fef0ef5a944bd4b412f9af9348665`. The repository preserves both
+the content-addressed JSON and its Sigstore bundle under
+`cdk/evidence/runs/31288954038/`. This promotes only the language-neutral
+`bootstrap-show-template-v32` execution scenario to `cli-pass`; the aggregate
+bootstrap capability remains `api-simulated`, with no supported language
+inferred from this client-side command.
+
+Ingestion is allowed only after offline bundle verification pins every signer
+boundary used by this record:
+
+```bash
+gh attestation verify capabilities/cdk/evidence/runs/31288954038/cdk-cli-execution-evidence.json \
+  --bundle capabilities/cdk/evidence/runs/31288954038/cdk-cli-execution-evidence.sigstore.json \
+  --repo cassiolpaixao90/localstack \
+  --signer-workflow cassiolpaixao90/localstack/.github/workflows/cdk-cli-blackbox.yml \
+  --source-digest 1a23acd9b65fef0ef5a944bd4b412f9af9348665 \
+  --source-ref refs/heads/main \
+  --deny-self-hosted-runners
+```
+
+The unit gate checks the retained bytes, DSSE subject and provenance fields;
+the command above is the cryptographic signature and certificate-chain gate.
 
 The static provider inventory covers the providers declared by this checkout.
 Static classifications use the provider registered as `default`; the JSON also
