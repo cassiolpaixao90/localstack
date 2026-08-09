@@ -129,15 +129,25 @@ def test_update_reconciles_mutable_role_properties_in_place():
         "list_attached_role_policies",
         "get_role_policy",
         "get_role",
+        "get_role",
         "detach_role_policy",
+        "get_role",
         "attach_role_policy",
+        "get_role",
         "delete_role_policy",
+        "get_role",
         "put_role_policy",
+        "get_role",
         "put_role_policy",
+        "get_role",
         "untag_role",
+        "get_role",
         "tag_role",
+        "get_role",
         "put_role_permissions_boundary",
+        "get_role",
         "update_role",
+        "get_role",
         "update_assume_role_policy",
     ]
     iam.list_role_policies.assert_not_called()
@@ -323,7 +333,7 @@ def test_update_ignores_an_already_removed_owned_child_when_role_exists():
     result = IAMRoleProvider().update(request)
 
     assert result.status == OperationStatus.SUCCESS
-    assert iam.get_role.call_count == 2
+    assert iam.get_role.call_count == 4
 
 
 def test_update_compensates_completed_operations_after_partial_failure():
@@ -349,14 +359,52 @@ def test_update_compensates_completed_operations_after_partial_failure():
 
     assert result.status == OperationStatus.FAILED
     assert result.resource_model == previous
-    assert iam.method_calls[:6] == [
+    assert iam.method_calls[:11] == [
+        call.get_role(RoleName="quota-role"),
         call.list_attached_role_policies(RoleName="quota-role"),
         call.get_role(RoleName="quota-role"),
+        call.get_role(RoleName="quota-role"),
         call.detach_role_policy(RoleName="quota-role", PolicyArn="arn:policy:old"),
+        call.get_role(RoleName="quota-role"),
         call.attach_role_policy(RoleName="quota-role", PolicyArn="arn:policy:new"),
+        call.get_role(RoleName="quota-role"),
+        call.detach_role_policy(RoleName="quota-role", PolicyArn="arn:policy:new"),
         call.get_role(RoleName="quota-role"),
         call.attach_role_policy(RoleName="quota-role", PolicyArn="arn:policy:old"),
     ]
+
+
+def test_update_compensates_operation_when_response_is_lost_after_commit():
+    previous = {
+        "RoleName": "quota-role",
+        "AssumeRolePolicyDocument": {"Statement": []},
+        "ManagedPolicyArns": ["arn:policy:old"],
+    }
+    desired = {
+        "RoleName": "quota-role",
+        "AssumeRolePolicyDocument": {"Statement": []},
+        "ManagedPolicyArns": [],
+    }
+    request, iam = _request(previous, desired)
+    attached = {"arn:policy:old"}
+
+    def detach_policy(*, RoleName, PolicyArn):
+        attached.remove(PolicyArn)
+        raise RuntimeError("response lost after commit")
+
+    def attach_policy(*, RoleName, PolicyArn):
+        attached.add(PolicyArn)
+
+    iam.detach_role_policy.side_effect = detach_policy
+    iam.attach_role_policy.side_effect = attach_policy
+
+    result = IAMRoleProvider().update(request)
+
+    assert result.status == OperationStatus.FAILED
+    assert attached == {"arn:policy:old"}
+    iam.attach_role_policy.assert_called_once_with(
+        RoleName="quota-role", PolicyArn="arn:policy:old"
+    )
 
 
 @pytest.mark.parametrize(
@@ -458,6 +506,49 @@ def test_create_compensates_role_children_after_partial_failure():
     ]
 
 
+def test_create_compensates_child_when_response_is_lost_after_commit():
+    request, iam = _request(
+        None,
+        {
+            "RoleName": "partially-created-role",
+            "AssumeRolePolicyDocument": {"Statement": []},
+            "ManagedPolicyArns": ["arn:policy:managed"],
+        },
+    )
+    iam.create_role.return_value = {
+        "Role": {
+            "Arn": "arn:aws:iam::000000000000:role/partially-created-role",
+            "RoleId": "AROAPARTIAL",
+        }
+    }
+    iam.get_role.return_value = {
+        "Role": {
+            "RoleName": "partially-created-role",
+            "RoleId": "AROAPARTIAL",
+            "Tags": [],
+        }
+    }
+    attached = set()
+
+    def attach_policy(*, RoleName, PolicyArn):
+        attached.add(PolicyArn)
+        raise RuntimeError("response lost after commit")
+
+    def detach_policy(*, RoleName, PolicyArn):
+        attached.remove(PolicyArn)
+
+    iam.attach_role_policy.side_effect = attach_policy
+    iam.detach_role_policy.side_effect = detach_policy
+
+    result = IAMRoleProvider().create(request)
+
+    assert result.status == OperationStatus.FAILED
+    assert attached == set()
+    iam.detach_role_policy.assert_called_once_with(
+        RoleName="partially-created-role", PolicyArn="arn:policy:managed"
+    )
+
+
 def test_create_does_not_clean_up_a_recreated_role():
     request, iam = _request(
         None,
@@ -483,7 +574,33 @@ def test_create_does_not_clean_up_a_recreated_role():
 
     assert result.status == OperationStatus.FAILED
     assert result.error_code == "NotFound"
+    iam.attach_role_policy.assert_not_called()
     iam.detach_role_policy.assert_not_called()
+    iam.delete_role.assert_not_called()
+
+
+def test_create_revalidates_identity_before_success():
+    request, iam = _request(
+        None,
+        {
+            "RoleName": "recreated-role",
+            "AssumeRolePolicyDocument": {"Statement": []},
+        },
+    )
+    iam.create_role.return_value = {
+        "Role": {
+            "Arn": "arn:aws:iam::000000000000:role/recreated-role",
+            "RoleId": "AROAORIGINAL",
+        }
+    }
+    iam.get_role.return_value = {
+        "Role": {"RoleName": "recreated-role", "RoleId": "AROAREPLACEMENT", "Tags": []}
+    }
+
+    result = IAMRoleProvider().create(request)
+
+    assert result.status == OperationStatus.FAILED
+    assert result.error_code == "NotFound"
     iam.delete_role.assert_not_called()
 
 
@@ -648,8 +765,11 @@ def test_update_supports_cdk_bootstrap_v28_to_v32_deployment_role():
     assert [method_call[0] for method_call in iam.method_calls] == [
         "list_attached_role_policies",
         "get_role",
+        "get_role",
         "attach_role_policy",
+        "get_role",
         "put_role_policy",
+        "get_role",
         "update_assume_role_policy",
     ]
     iam.attach_role_policy.assert_called_once_with(
@@ -978,6 +1098,73 @@ def test_update_does_not_rollback_into_recreated_role():
 
     assert result.status == OperationStatus.FAILED
     assert result.error_code == "NotFound"
-    assert iam.attach_role_policy.call_args_list == [
-        call(RoleName="role", PolicyArn="arn:policy:new")
-    ]
+    iam.detach_role_policy.assert_not_called()
+    iam.attach_role_policy.assert_not_called()
+
+
+def test_update_revalidates_identity_before_each_mutation():
+    previous = {
+        "RoleName": "role",
+        "RoleId": "AROAORIGINAL",
+        "AssumeRolePolicyDocument": {"Statement": []},
+        "ManagedPolicyArns": ["arn:policy:old"],
+    }
+    desired = {
+        "RoleName": "role",
+        "AssumeRolePolicyDocument": {"Statement": []},
+        "ManagedPolicyArns": ["arn:policy:new"],
+    }
+    request, iam = _request(previous, desired)
+    live_role_id = "AROAORIGINAL"
+
+    def get_role(*, RoleName):
+        return {"Role": {"RoleName": RoleName, "RoleId": live_role_id, "Tags": []}}
+
+    def replace_role_after_detach(**_kwargs):
+        nonlocal live_role_id
+        live_role_id = "AROAREPLACEMENT"
+
+    iam.get_role.side_effect = get_role
+    iam.detach_role_policy.side_effect = replace_role_after_detach
+
+    result = IAMRoleProvider().update(request)
+
+    assert result.status == OperationStatus.FAILED
+    assert result.error_code == "NotFound"
+    iam.detach_role_policy.assert_called_once_with(RoleName="role", PolicyArn="arn:policy:old")
+    iam.attach_role_policy.assert_not_called()
+
+
+def test_update_legacy_state_snapshots_identity_before_child_reads():
+    previous = {
+        "RoleName": "legacy-role",
+        "AssumeRolePolicyDocument": {"Statement": []},
+        "ManagedPolicyArns": [],
+    }
+    desired = {
+        "RoleName": "legacy-role",
+        "AssumeRolePolicyDocument": {"Statement": []},
+        "ManagedPolicyArns": ["arn:policy:external"],
+    }
+    request, iam = _request(previous, desired)
+    live_role_id = "AROAORIGINAL"
+
+    def get_role(*, RoleName):
+        return {"Role": {"RoleName": RoleName, "RoleId": live_role_id, "Tags": []}}
+
+    def list_attached_role_policies(**_kwargs):
+        nonlocal live_role_id
+        live_role_id = "AROAREPLACEMENT"
+        return {
+            "AttachedPolicies": [{"PolicyArn": "arn:policy:external"}],
+            "IsTruncated": False,
+        }
+
+    iam.get_role.side_effect = get_role
+    iam.list_attached_role_policies.side_effect = list_attached_role_policies
+
+    result = IAMRoleProvider().update(request)
+
+    assert result.status == OperationStatus.FAILED
+    assert result.error_code == "NotFound"
+    iam.attach_role_policy.assert_not_called()

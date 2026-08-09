@@ -459,8 +459,8 @@ The first bootstrap-update blocker is now covered at provider level:
 permissions boundaries, description, session duration, and owned tags without
 changing `RoleId` or deleting external children. Its unit gate models the
 critical bootstrap v28-to-v32 `DeploymentActionRole` delta and proves the
-five-call provider budget: one identity read, one collision-safety read, and
-three mutations. The local CloudFormation v2 gate now deploys the pinned
+eight-call provider budget: one identity snapshot, one collision-safety read,
+three just-in-time identity checks, and three mutations. The local CloudFormation v2 gate now deploys the pinned
 official v28 template and updates the same stack to the byte-exact pinned v32
 template. It verifies all five role identities and ARNs, external managed
 policy ownership, the v32 trust/inline/managed policy deltas, the SSM version,

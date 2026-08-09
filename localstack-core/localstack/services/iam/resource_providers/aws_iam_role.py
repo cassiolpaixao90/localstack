@@ -283,7 +283,13 @@ def _capture_external_collisions(
     managed_additions: set[str],
     inline_additions: set[str],
     tag_additions: set[str],
+    expected_role_id: str | None,
 ) -> tuple[_ExternalCollisions, dict]:
+    if not isinstance(expected_role_id, str) or not expected_role_id:
+        expected_role_id = _validated_live_role(iam.get_role(RoleName=role_name), role_name)[
+            "RoleId"
+        ]
+
     existing_managed = (
         _existing_managed_additions(iam, role_name, managed_additions)
         if managed_additions
@@ -303,6 +309,8 @@ def _capture_external_collisions(
         existing_inline[policy_name] = _policy_document(response["PolicyDocument"], inline=True)
 
     live_role = _validated_live_role(iam.get_role(RoleName=role_name), role_name)
+    if live_role["RoleId"] != expected_role_id:
+        raise _RoleNotFound(role_name)
     existing_tags = {
         tag["Key"]: tag["Value"]
         for tag in live_role.get("Tags", [])
@@ -344,8 +352,9 @@ def _execute_update_operations(
     completed = []
     try:
         for operation in operations:
-            operation.apply.function(**operation.apply.kwargs)
+            _ensure_role_identity(iam, role_name, expected_role_id)
             completed.append(operation)
+            operation.apply.function(**operation.apply.kwargs)
     except Exception as apply_error:
         for operation in reversed(completed):
             for rollback in operation.rollback:
@@ -478,26 +487,29 @@ class IAMRoleProvider(ResourceProvider[IAMRoleProperties]):
         cleanup = [_Call(iam.delete_role, {"RoleName": role_name})]
         try:
             for arn in sorted(managed_policy_arns):
-                iam.attach_role_policy(RoleName=role_name, PolicyArn=arn)
+                _ensure_role_identity(iam, role_name, created_role_id)
                 cleanup.append(
                     _Call(
                         iam.detach_role_policy,
                         {"RoleName": role_name, "PolicyArn": arn},
                     )
                 )
+                iam.attach_role_policy(RoleName=role_name, PolicyArn=arn)
 
             for policy_name in sorted(inline_policies):
-                iam.put_role_policy(
-                    RoleName=model["RoleName"],
-                    PolicyName=policy_name,
-                    PolicyDocument=json.dumps(inline_policies[policy_name]),
-                )
+                _ensure_role_identity(iam, role_name, created_role_id)
                 cleanup.append(
                     _Call(
                         iam.delete_role_policy,
                         {"RoleName": role_name, "PolicyName": policy_name},
                     )
                 )
+                iam.put_role_policy(
+                    RoleName=model["RoleName"],
+                    PolicyName=policy_name,
+                    PolicyDocument=json.dumps(inline_policies[policy_name]),
+                )
+            _ensure_role_identity(iam, role_name, created_role_id)
         except Exception as error:
             failure = error
             try:
@@ -669,6 +681,7 @@ class IAMRoleProvider(ResourceProvider[IAMRoleProperties]):
         tag_additions = set(desired_tags.keys() - previous_tags.keys())
         previous_boundary = previous.get("PermissionsBoundary")
         desired_boundary = desired.get("PermissionsBoundary")
+        previous_role_id = previous.get("RoleId")
         try:
             external, live_role = _capture_external_collisions(
                 iam=iam,
@@ -676,21 +689,17 @@ class IAMRoleProvider(ResourceProvider[IAMRoleProperties]):
                 managed_additions=managed_additions,
                 inline_additions=inline_additions,
                 tag_additions=tag_additions,
+                expected_role_id=previous_role_id,
             )
-            previous_role_id = previous.get("RoleId")
             live_role_id = live_role["RoleId"]
-            if isinstance(previous_role_id, str) and previous_role_id != live_role_id:
-                return ProgressEvent(
-                    status=OperationStatus.FAILED,
-                    resource_model=previous,
-                    error_code="NotFound",
-                    message=f"IAM role {role_name} no longer has the expected identity",
-                )
         except Exception as error:
             error_code = (
                 "NotFound"
-                if isinstance(error, ClientError)
-                and error.response.get("Error", {}).get("Code") == "NoSuchEntity"
+                if isinstance(error, _RoleNotFound)
+                or (
+                    isinstance(error, ClientError)
+                    and error.response.get("Error", {}).get("Code") == "NoSuchEntity"
+                )
                 else "GeneralServiceException"
             )
             return ProgressEvent(
