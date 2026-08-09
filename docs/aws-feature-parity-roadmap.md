@@ -501,7 +501,7 @@ manifest therefore records `bootstrap-show-template-v32` as a language-neutral
 the broad bootstrap status or satisfy the deploy, Cloud Assembly, language, or
 AWS differential gates.
 
-The next diagnostic gate seeds the pinned official bootstrap v28 template
+The next diagnostic gate seeds the pinned repository bootstrap v28 fixture
 through the LocalStack CloudFormation API and then invokes the same pinned real
 CDK CLI with its built-in v32 template. It uses a unique toolkit stack and
 qualifier, verifies the in-place stack and IAM role identities, preserves an
@@ -511,6 +511,20 @@ JUnit result in the isolated amd64/arm64 matrix without changing the retained
 `bootstrap-show-template-v32` receipt or attestation. Until the deployment
 scenario has its own content-addressed two-platform evidence and reviewed
 promotion commit, `bootstrap-deployment-cli-not-run` remains an active gap.
+
+Run `31290258541` for commit
+`ccaa955d086e56dc04caa521bf1ffe047292a1c0` passed that diagnostic in native
+amd64 and arm64, but emitted only JUnit for the upgrade and therefore is not a
+promotable evidence run. The follow-up contract keeps the original
+show-template aggregate unchanged and gives the upgrade its own bounded
+observation, post-cleanup lane receipt, two-platform aggregate, schema,
+attestation subject, and artifact namespace. The first subsequent
+first-attempt `main` run to produce that complete chain is only a candidate;
+promotion remains a separate reviewed commit. Ingestion and promotion must run
+both the closed schema and the scenario runtime validator; schema-only parsing
+is not an evidence gate for cross-field invariants. The actual CLI argv is
+validated before the observation is emitted and stored as one normalized
+command plus a closed derivation contract rather than duplicated dynamic data.
 
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK

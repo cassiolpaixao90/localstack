@@ -140,6 +140,25 @@ the content-addressed JSON and its Sigstore bundle under
 bootstrap capability remains `api-simulated`, with no supported language
 inferred from this client-side command.
 
+The separate `bootstrap-upgrade-v28-v32` gate seeds the pinned repository v28
+fixture with a CloudFormation change set and upgrades that stack through the
+real CDK CLI's built-in v32 template. The test writes only a bounded provisional
+observation. A lane receipt is created after pytest has returned successfully,
+the exact JUnit has proved that strict stack, bucket, role, and SSM cleanup also
+completed, and the run/platform/toolchain contract has been validated. The
+real argv is checked before emission and represented once by its normalized
+dynamic fields plus a closed `argv_contract`, avoiding contradictory duplicate
+values in the record. The two
+native receipts are aggregated under
+`cdk/bootstrap-upgrade-execution-evidence.schema.json` and attested as a subject
+separate from the retained `bootstrap-show-template-v32` evidence. Candidate
+records remain ineligible for promotion until a later review preserves and
+verifies the exact first-attempt post-merge run. This transition does not prove
+a clean bootstrap create, Cloud Assembly, any language binding, or AWS parity.
+Promotion must pass both the closed JSON Schema and the scenario runtime
+validator, which enforces cross-field run, platform, and command relationships
+that JSON Schema cannot express by itself.
+
 Ingestion is allowed only after offline bundle verification pins every signer
 boundary used by this record:
 

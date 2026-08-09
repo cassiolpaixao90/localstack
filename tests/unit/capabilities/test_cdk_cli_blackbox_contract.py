@@ -79,6 +79,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert job["runs-on"] == "${{ matrix.runner }}"
 
     steps = {step["name"]: step for step in job["steps"]}
+    step_names = [step["name"] for step in job["steps"]]
     checkout = steps["Checkout"]
     assert checkout["uses"] == "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803"
     assert checkout["with"]["persist-credentials"] is False
@@ -92,6 +93,15 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert "sudo timeout --signal=TERM --kill-after=10s 420s" in isolated_run
     assert "unshare --net --pid --fork --kill-child=KILL --mount-proc" in isolated_run
     assert "scripts/run_cdk_cli_blackbox_isolated.sh" in isolated_run
+    for github_value in (
+        "github.repository",
+        "github.sha",
+        "github.ref",
+        "github.event_name",
+        "github.run_id",
+        "github.run_attempt",
+    ):
+        assert github_value in isolated_run
     assert 'sudo chown -R "$host_uid:$host_gid" "$gate_root"' in isolated_run
 
     isolated_runner = ISOLATED_RUNNER_PATH.read_text()
@@ -130,6 +140,23 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     )
     assert "pytest-junit-cdk-bootstrap-upgrade-$RESULT_ARCH.xml" in isolated_runner
     assert "--scenario bootstrap-upgrade-v28-v32" in isolated_runner
+    assert "CDK_BOOTSTRAP_UPGRADE_OBSERVATION=" in isolated_runner
+    for variable in (
+        "CDK_EVIDENCE_REPOSITORY",
+        "CDK_EVIDENCE_COMMIT_SHA",
+        "CDK_EVIDENCE_REF",
+        "CDK_EVIDENCE_EVENT",
+        "CDK_EVIDENCE_WORKFLOW_PATH",
+        "CDK_EVIDENCE_RUN_ID",
+        "CDK_EVIDENCE_RUN_ATTEMPT",
+    ):
+        assert variable in isolated_runner
+    lane_builder = steps["Build bootstrap upgrade lane receipt"]["run"]
+    assert "bootstrap_upgrade_execution_evidence.py lane" in lane_builder
+    assert "cdk-bootstrap-upgrade-execution-receipt-${{ matrix.arch }}.json" in lane_builder
+    assert step_names.index("Run CDK gate without external egress") < step_names.index(
+        "Build bootstrap upgrade lane receipt"
+    )
     assert "TEST_TARGET=LOCALSTACK" in isolated_runner
     assert "CDK_REAL_CLI_REQUIRED=1" in isolated_runner
     assert 'if [[ -w "$WORKSPACE" ]]' in isolated_runner
@@ -143,13 +170,13 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert steps["Archive lane result"]["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     )
-    diagnostic = steps["Archive bootstrap upgrade diagnostic"]
-    assert diagnostic["uses"] == (
+    upgrade_lane = steps["Archive bootstrap upgrade lane result"]
+    assert upgrade_lane["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     )
-    assert diagnostic["with"]["name"] == "diagnostic-cdk-bootstrap-upgrade-${{ matrix.arch }}"
-    assert "test-results-cdk-cli-" not in diagnostic["with"]["name"]
-    assert diagnostic["with"]["if-no-files-found"] == "error"
+    assert upgrade_lane["with"]["name"] == "test-results-cdk-bootstrap-upgrade-${{ matrix.arch }}"
+    assert "test-results-cdk-cli-" not in upgrade_lane["with"]["name"]
+    assert upgrade_lane["with"]["if-no-files-found"] == "error"
     assert steps["Reject workflow reruns"]["run"] == 'test "${{ github.run_attempt }}" = 1'
 
     aggregator = workflow["jobs"]["cdk-cli-blackbox-complete"]
@@ -175,6 +202,22 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
         "artifact-metadata": "write",
     }
     assert aggregate_steps["Archive candidate evidence"]["with"]["retention-days"] == 90
+    assert "Download bootstrap upgrade results" in aggregate_steps
+    assert "Require the passing bootstrap upgrade matrix" in aggregate_steps
+    upgrade_build = aggregate_steps["Build bootstrap upgrade candidate evidence"]["run"]
+    assert "bootstrap_upgrade_execution_evidence.py aggregate" in upgrade_build
+    assert (
+        "--scenario bootstrap-upgrade-v28-v32"
+        in aggregate_steps["Require the passing bootstrap upgrade matrix"]["run"]
+    )
+    assert (
+        aggregate_steps["Attest bootstrap upgrade candidate evidence"]["with"]["subject-path"]
+        == "target/cdk-bootstrap-upgrade-execution-evidence.json"
+    )
+    assert (
+        aggregate_steps["Archive bootstrap upgrade candidate evidence"]["with"]["name"]
+        == "cdk-bootstrap-upgrade-execution-evidence"
+    )
 
 
 def test_required_cdk_cli_gate_rejects_external_network_interfaces():

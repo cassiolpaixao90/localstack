@@ -5,6 +5,7 @@ import socket
 import sys
 import time
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from math import ceil
 from pathlib import Path
 
@@ -21,6 +22,11 @@ from localstack.cli.cdk import (
 from localstack.services.cloudformation.v2.utils import is_v2_engine
 from localstack.testing.pytest import markers
 from localstack.utils.strings import short_uid
+from tests.aws.cli.bootstrap_upgrade_execution_evidence import (
+    MAX_OBSERVATION_BYTES,
+    create_observation,
+)
+from tests.aws.cli.execution_evidence import write_canonical_json
 from tests.aws.cli.test_cdk_cli_blackbox import _load_bounded_yaml
 
 PROJECT_ROOT = Path(__file__).parents[3]
@@ -325,6 +331,7 @@ def cdk_v28_stack(
             StackName=stack_id,
         )
         created_stack = aws_client.cloudformation.describe_stacks(StackName=stack_id)["Stacks"][0]
+        assert created_stack["StackStatus"] == "CREATE_COMPLETE"
         created_outputs = {
             output["OutputKey"]: output["OutputValue"]
             for output in created_stack.get("Outputs", [])
@@ -484,28 +491,59 @@ def test_cdk_cli_upgrades_api_v28_to_builtin_v32(
     account_id,
     region_name,
 ):
+    observation_path = os.environ.get("CDK_BOOTSTRAP_UPGRADE_OBSERVATION")
+    if observation_path and not _REQUIRED:
+        pytest.fail("bootstrap upgrade observations are restricted to the required CI lane")
+    _require(
+        not _REQUIRED or observation_path is not None,
+        "the required bootstrap upgrade gate needs an observation path",
+        required=_REQUIRED,
+    )
+    evidence_environment = {
+        name: os.environ.get(name)
+        for name in (
+            "RESULT_ARCH",
+            "CDK_EXPECTED_MACHINE_ARCH",
+            "CDK_EXPECTED_NODE_ARCH",
+            "CDK_EVIDENCE_REPOSITORY",
+            "CDK_EVIDENCE_COMMIT_SHA",
+            "CDK_EVIDENCE_REF",
+            "CDK_EVIDENCE_EVENT",
+            "CDK_EVIDENCE_WORKFLOW_PATH",
+            "CDK_EVIDENCE_RUN_ID",
+            "CDK_EVIDENCE_RUN_ATTEMPT",
+        )
+    }
+    _require(
+        not _REQUIRED or all(evidence_environment.values()),
+        "the required bootstrap upgrade gate needs complete evidence metadata",
+        required=_REQUIRED,
+    )
+    argv = [
+        "bootstrap",
+        f"aws://{account_id}/{region_name}",
+        "--toolkit-stack-name",
+        cdk_v28_stack.stack_name,
+        "--qualifier",
+        cdk_v28_stack.qualifier,
+        "--bootstrap-kms-key-id",
+        "AWS_MANAGED_KEY",
+        "--yes",
+        "--ci",
+        "--no-color",
+        "--no-notices",
+        "--execute",
+    ]
+    started = time.monotonic_ns()
     result = launch_cdk(
-        [
-            "bootstrap",
-            f"aws://{account_id}/{region_name}",
-            "--toolkit-stack-name",
-            cdk_v28_stack.stack_name,
-            "--qualifier",
-            cdk_v28_stack.qualifier,
-            "--bootstrap-kms-key-id",
-            "AWS_MANAGED_KEY",
-            "--yes",
-            "--ci",
-            "--no-color",
-            "--no-notices",
-            "--execute",
-        ],
+        argv,
         executable=pinned_cdk_cli_runtime.executable,
         environment=pinned_cdk_cli_runtime.environment,
         cwd=pinned_cdk_cli_runtime.workspace,
         timeout_seconds=90,
         max_output_bytes=256 * 1024,
     )
+    duration_ms = (time.monotonic_ns() - started) // 1_000_000
     assert result.returncode == 0, result.stderr.decode(errors="replace")
     assert result.timed_out is False
     assert result.stdout_truncated is False
@@ -589,3 +627,37 @@ def test_cdk_cli_upgrades_api_v28_to_builtin_v32(
     statement_ids = {statement.get("Sid") for statement in deployment_policy["Statement"]}
     assert "DeployPermissions" in statement_ids
     assert "CloudFormationPermissions" not in statement_ids
+
+    if observation_path:
+        observation = create_observation(
+            platform_id=f"linux-{evidence_environment['RESULT_ARCH']}",
+            machine_arch=evidence_environment["CDK_EXPECTED_MACHINE_ARCH"],
+            node_arch=evidence_environment["CDK_EXPECTED_NODE_ARCH"],
+            python_version=platform.python_version(),
+            kernel_release=platform.release(),
+            repository=evidence_environment["CDK_EVIDENCE_REPOSITORY"],
+            commit_sha=evidence_environment["CDK_EVIDENCE_COMMIT_SHA"],
+            ref=evidence_environment["CDK_EVIDENCE_REF"],
+            event=evidence_environment["CDK_EVIDENCE_EVENT"],
+            workflow_path=evidence_environment["CDK_EVIDENCE_WORKFLOW_PATH"],
+            run_id=int(evidence_environment["CDK_EVIDENCE_RUN_ID"]),
+            run_attempt=int(evidence_environment["CDK_EVIDENCE_RUN_ATTEMPT"]),
+            account_id=account_id,
+            region=region_name,
+            stack_name=cdk_v28_stack.stack_name,
+            qualifier=cdk_v28_stack.qualifier,
+            argv=argv,
+            stack_id=cdk_v28_stack.stack_id,
+            role_identities=cdk_v28_stack.role_identities,
+            returncode=result.returncode,
+            timed_out=result.timed_out,
+            duration_ms=duration_ms,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            stdout_bytes=result.stdout_bytes,
+            stderr_bytes=result.stderr_bytes,
+            stdout_truncated=result.stdout_truncated,
+            stderr_truncated=result.stderr_truncated,
+            observed_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        )
+        write_canonical_json(Path(observation_path), observation, MAX_OBSERVATION_BYTES)

@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://localstack.cloud/schemas/cdk-bootstrap-upgrade-execution-evidence-v1.json",
+  "title": "LocalStack CDK bootstrap upgrade execution evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "mode",
+    "evidence_id",
+    "claim_id",
+    "subject",
+    "run",
+    "scenario",
+    "toolchain",
+    "verification_contract",
+    "harness",
+    "lanes",
+    "promotion"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "record_type": {"const": "aggregate"},
+    "mode": {"const": "diagnostic-candidate"},
+    "evidence_id": {"$ref": "#/$defs/sha256"},
+    "claim_id": {"$ref": "#/$defs/sha256"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha", "ref"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1, "maxLength": 256},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "ref": {"const": "refs/heads/main"}
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "workflow_path", "run_id", "run_attempt", "event"],
+      "properties": {
+        "provider": {"const": "github-actions"},
+        "workflow_path": {"const": ".github/workflows/cdk-cli-blackbox.yml"},
+        "run_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "run_attempt": {"const": 1},
+        "event": {"const": "push"}
+      }
+    },
+    "scenario": {"$ref": "#/$defs/scenario"},
+    "toolchain": {"$ref": "#/$defs/aggregateToolchain"},
+    "verification_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["functional", "cleanup"],
+      "properties": {
+        "functional": {"$ref": "#/$defs/functionalVerification"},
+        "cleanup": {"$ref": "#/$defs/cleanup"}
+      }
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_sha256"],
+      "properties": {
+        "input_sha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            ".github/workflows/cdk-cli-blackbox.yml",
+            ".python-version",
+            "Makefile",
+            "capabilities/cdk/bootstrap-upgrade-execution-evidence.schema.json",
+            "capabilities/cdk/compatibility.json",
+            "localstack-core/localstack/cli/_cdk_health_probe.py",
+            "localstack-core/localstack/cli/cdk.py",
+            "localstack-core/localstack/services/iam/iam_patches.py",
+            "localstack-core/localstack/services/moto.py",
+            "localstack-core/localstack/services/iam/resource_providers/aws_iam_role.py",
+            "localstack-core/localstack/services/iam/resource_providers/aws_iam_role.schema.json",
+            "pyproject.toml",
+            "requirements-test.txt",
+            "scripts/run_cdk_cli_blackbox_isolated.sh",
+            "tests/aws/cli/bootstrap_upgrade_execution_evidence.py",
+            "tests/aws/cli/execution_evidence.py",
+            "tests/aws/cli/package-lock.json",
+            "tests/aws/cli/package.json",
+            "tests/aws/cli/test_cdk_cli_blackbox.py",
+            "tests/aws/cli/test_cdk_cli_bootstrap_upgrade.py",
+            "tests/aws/cli/validate_junit.py",
+            "tests/aws/templates/cdk_bootstrap_v28.yaml",
+            "tests/aws/templates/cdk_bootstrap_v32.yaml"
+          ],
+          "properties": {
+            ".github/workflows/cdk-cli-blackbox.yml": {"$ref": "#/$defs/sha256"},
+            ".python-version": {"$ref": "#/$defs/sha256"},
+            "Makefile": {"$ref": "#/$defs/sha256"},
+            "capabilities/cdk/bootstrap-upgrade-execution-evidence.schema.json": {"$ref": "#/$defs/sha256"},
+            "capabilities/cdk/compatibility.json": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/cli/_cdk_health_probe.py": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/cli/cdk.py": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/services/iam/iam_patches.py": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/services/moto.py": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/services/iam/resource_providers/aws_iam_role.py": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/services/iam/resource_providers/aws_iam_role.schema.json": {"$ref": "#/$defs/sha256"},
+            "pyproject.toml": {"$ref": "#/$defs/sha256"},
+            "requirements-test.txt": {"$ref": "#/$defs/sha256"},
+            "scripts/run_cdk_cli_blackbox_isolated.sh": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/bootstrap_upgrade_execution_evidence.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/execution_evidence.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/package-lock.json": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/package.json": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/test_cdk_cli_blackbox.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/test_cdk_cli_bootstrap_upgrade.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/validate_junit.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/templates/cdk_bootstrap_v28.yaml": {"$ref": "#/$defs/sha256"},
+            "tests/aws/templates/cdk_bootstrap_v32.yaml": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    },
+    "lanes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "allOf": [
+            {"$ref": "#/$defs/laneReceipt"},
+            {"properties": {"platform": {"properties": {"id": {"const": "linux-amd64"}, "machine_arch": {"const": "x86_64"}, "node_arch": {"const": "x64"}}}}}
+          ]
+        },
+        {
+          "allOf": [
+            {"$ref": "#/$defs/laneReceipt"},
+            {"properties": {"platform": {"properties": {"id": {"const": "linux-arm64"}, "machine_arch": {"const": "aarch64"}, "node_arch": {"const": "arm64"}}}}}
+          ]
+        }
+      ],
+      "items": false
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eligible", "blockers"],
+      "properties": {
+        "eligible": {"const": false},
+        "blockers": {
+          "const": [
+            "not-reviewed-for-promotion",
+            "no-clean-bootstrap-create",
+            "no-cloud-assembly",
+            "no-language-binding",
+            "no-aws-differential"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "utc": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"},
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "result", "construct_language", "cloud_assembly_produced", "resource_deployment_performed", "aws_differential", "seed_mechanism", "target_template_source", "cleanup_required"],
+      "properties": {
+        "id": {"const": "bootstrap-upgrade-v28-v32"},
+        "result": {"const": "cli-pass"},
+        "construct_language": {"type": "null"},
+        "cloud_assembly_produced": {"const": false},
+        "resource_deployment_performed": {"const": true},
+        "aws_differential": {"const": false},
+        "seed_mechanism": {"const": "cloudformation-api-change-set"},
+        "target_template_source": {"const": "cdk-cli-built-in"},
+        "cleanup_required": {"const": true}
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_version", "cdk_cli_version", "source_bootstrap_version", "target_bootstrap_version", "source_template_byte_sha256", "source_template_semantic_sha256", "target_template_byte_sha256", "target_template_semantic_sha256"],
+      "properties": {
+        "node_version": {"const": "22.23.2"},
+        "cdk_cli_version": {"const": "2.1135.1"},
+        "source_bootstrap_version": {"const": 28},
+        "target_bootstrap_version": {"const": 32},
+        "source_template_byte_sha256": {"const": "sha256:d84e26fcd602ef1b58a60a71e7f47a4cc9a6fa3f62e7c88182905cfb080fab4e"},
+        "source_template_semantic_sha256": {"const": "sha256:7a86502e6cdd86402f3ce159f12d89e7ed0cc0d37bf399202f6ee98bb41b5169"},
+        "target_template_byte_sha256": {"const": "sha256:a484ad768d3446874161044d986bec096e201a54037c8ce93ed5a0d215e1dd25"},
+        "target_template_semantic_sha256": {"const": "sha256:9e04a3226e702258e2ba13063dc6ecbc6fba7880d9fa27298445499db453013a"}
+      }
+    },
+    "aggregateToolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_version", "cdk_cli_version", "source_bootstrap_version", "target_bootstrap_version", "source_template_byte_sha256", "source_template_semantic_sha256", "target_template_byte_sha256", "target_template_semantic_sha256", "npm_integrity"],
+      "properties": {
+        "node_version": {"const": "22.23.2"},
+        "cdk_cli_version": {"const": "2.1135.1"},
+        "source_bootstrap_version": {"const": 28},
+        "target_bootstrap_version": {"const": 32},
+        "source_template_byte_sha256": {"const": "sha256:d84e26fcd602ef1b58a60a71e7f47a4cc9a6fa3f62e7c88182905cfb080fab4e"},
+        "source_template_semantic_sha256": {"const": "sha256:7a86502e6cdd86402f3ce159f12d89e7ed0cc0d37bf399202f6ee98bb41b5169"},
+        "target_template_byte_sha256": {"const": "sha256:a484ad768d3446874161044d986bec096e201a54037c8ce93ed5a0d215e1dd25"},
+        "target_template_semantic_sha256": {"const": "sha256:9e04a3226e702258e2ba13063dc6ecbc6fba7880d9fa27298445499db453013a"},
+        "npm_integrity": {"const": "sha512-g1jcMfWlyYtGamFJ/kPBOCuchl3NfwTF2UwOLTIDN0nJbGm84EAO+c8DlYnaemM8UmKFkdoq4BGdmiNL5nHWwA=="}
+      }
+    },
+    "functionalVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seed_stack_status", "seed_output_and_ssm_version", "seed_template_matches_fixture", "same_stack_id", "preserved_role_identity_count", "external_policy_preserved_count", "target_stack_status", "target_output_and_ssm_version", "target_template_matches_fixture", "managed_policy_delta_verified", "trust_policy_delta_count", "inline_policy_delta_verified", "default_stack_absent", "default_qualifier_absent"],
+      "properties": {
+        "seed_stack_status": {"const": "CREATE_COMPLETE"},
+        "seed_output_and_ssm_version": {"const": 28},
+        "seed_template_matches_fixture": {"const": true},
+        "same_stack_id": {"const": true},
+        "preserved_role_identity_count": {"const": 5},
+        "external_policy_preserved_count": {"const": 5},
+        "target_stack_status": {"const": "UPDATE_COMPLETE"},
+        "target_output_and_ssm_version": {"const": 32},
+        "target_template_matches_fixture": {"const": true},
+        "managed_policy_delta_verified": {"const": true},
+        "trust_policy_delta_count": {"const": 4},
+        "inline_policy_delta_verified": {"const": true},
+        "default_stack_absent": {"const": true},
+        "default_qualifier_absent": {"const": true}
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completed", "stack_absent", "bucket_absent", "absent_role_count", "ssm_parameter_absent"],
+      "properties": {
+        "completed": {"const": true},
+        "stack_absent": {"const": true},
+        "bucket_absent": {"const": true},
+        "absent_role_count": {"const": 5},
+        "ssm_parameter_absent": {"const": true}
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["account_id", "region", "stack_name", "qualifier", "argv_contract"],
+      "properties": {
+        "account_id": {"type": "string", "pattern": "^[0-9]{12}$"},
+        "region": {"type": "string", "pattern": "^[a-z]{2}(?:-gov)?-[a-z]+-[0-9]$"},
+        "stack_name": {"type": "string", "pattern": "^CDKToolkit-[a-z0-9]{8,32}$"},
+        "qualifier": {
+          "type": "string",
+          "pattern": "^[a-z0-9]{1,10}$",
+          "not": {"const": "hnb659fds"}
+        },
+        "argv_contract": {"const": "bootstrap-upgrade-v28-to-built-in-v32-v1"}
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "stack_id_sha256", "role_identities_sha256"],
+      "properties": {
+        "contract": {"$ref": "#/$defs/functionalVerification"},
+        "stack_id_sha256": {"$ref": "#/$defs/sha256"},
+        "role_identities_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "returncode", "timed_out", "duration_ms", "stdout_bytes", "stderr_bytes", "stdout_sha256", "stderr_sha256", "stdout_truncated", "stderr_truncated"],
+      "properties": {
+        "status": {"const": "pass"},
+        "returncode": {"const": 0},
+        "timed_out": {"const": false},
+        "duration_ms": {"type": "integer", "minimum": 0, "maximum": 90000},
+        "stdout_bytes": {"type": "integer", "minimum": 0, "maximum": 262144},
+        "stderr_bytes": {"type": "integer", "minimum": 0, "maximum": 262144},
+        "stdout_sha256": {"$ref": "#/$defs/sha256"},
+        "stderr_sha256": {"$ref": "#/$defs/sha256"},
+        "stdout_truncated": {"const": false},
+        "stderr_truncated": {"const": false}
+      }
+    },
+    "laneRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha", "ref", "event", "workflow_path", "run_id", "run_attempt"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1, "maxLength": 256},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "ref": {"const": "refs/heads/main"},
+        "event": {"const": "push"},
+        "workflow_path": {"const": ".github/workflows/cdk-cli-blackbox.yml"},
+        "run_id": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+        "run_attempt": {"const": 1}
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "machine_arch", "node_arch", "python_version", "kernel_release"],
+      "properties": {
+        "id": {"enum": ["linux-amd64", "linux-arm64"]},
+        "machine_arch": {"type": "string", "minLength": 1, "maxLength": 32},
+        "node_arch": {"type": "string", "minLength": 1, "maxLength": 32},
+        "python_version": {"type": "string", "minLength": 1, "maxLength": 32},
+        "kernel_release": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "junit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "bytes"],
+      "properties": {
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "bytes": {"type": "integer", "minimum": 1, "maximum": 1048576}
+      }
+    },
+    "laneReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "record_type", "receipt_id", "scenario", "toolchain", "run", "platform", "command", "verification", "result", "junit", "cleanup", "observed_at", "completed_at"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "record_type": {"const": "lane-receipt"},
+        "receipt_id": {"$ref": "#/$defs/sha256"},
+        "scenario": {"$ref": "#/$defs/scenario"},
+        "toolchain": {"$ref": "#/$defs/toolchain"},
+        "run": {"$ref": "#/$defs/laneRun"},
+        "platform": {"$ref": "#/$defs/platform"},
+        "command": {"$ref": "#/$defs/command"},
+        "verification": {"$ref": "#/$defs/verification"},
+        "result": {"$ref": "#/$defs/result"},
+        "junit": {"$ref": "#/$defs/junit"},
+        "cleanup": {"$ref": "#/$defs/cleanup"},
+        "observed_at": {"$ref": "#/$defs/utc"},
+        "completed_at": {"$ref": "#/$defs/utc"}
+      }
+    }
+  }
+}

@@ -7,8 +7,8 @@ shift || true
 
 case "$mode" in
   enter)
-    if [[ "$#" -ne 8 ]]; then
-      echo "usage: $0 enter UID GID GATE_ROOT NODE_DIR WORKSPACE ARCH MACHINE_ARCH NODE_ARCH" >&2
+    if [[ "$#" -ne 14 ]]; then
+      echo "usage: $0 enter UID GID GATE_ROOT NODE_DIR WORKSPACE ARCH MACHINE_ARCH NODE_ARCH REPOSITORY COMMIT_SHA REF EVENT RUN_ID RUN_ATTEMPT" >&2
       exit 2
     fi
     if [[ "$EUID" -ne 0 ]]; then
@@ -24,6 +24,12 @@ case "$mode" in
     readonly result_arch="$6"
     readonly machine_arch="$7"
     readonly node_arch="$8"
+    readonly repository="$9"
+    readonly commit_sha="${10}"
+    readonly ref="${11}"
+    readonly event="${12}"
+    readonly run_id="${13}"
+    readonly run_attempt="${14}"
     readonly sandbox_workspace="/mnt/localstack-cdk-workspace"
     readonly sandbox_gate_root="/mnt/localstack-cdk-gate"
 
@@ -56,8 +62,16 @@ case "$mode" in
         WORKSPACE="$sandbox_workspace" \
         RESULT_ARCH="$result_arch" \
         CDK_EXECUTION_RECEIPT="$sandbox_gate_root/cdk-execution-receipt-$result_arch.json" \
+        CDK_BOOTSTRAP_UPGRADE_OBSERVATION="$sandbox_gate_root/cdk-bootstrap-upgrade-observation-$result_arch.json" \
         CDK_EXPECTED_MACHINE_ARCH="$machine_arch" \
         CDK_EXPECTED_NODE_ARCH="$node_arch" \
+        CDK_EVIDENCE_REPOSITORY="$repository" \
+        CDK_EVIDENCE_COMMIT_SHA="$commit_sha" \
+        CDK_EVIDENCE_REF="$ref" \
+        CDK_EVIDENCE_EVENT="$event" \
+        CDK_EVIDENCE_WORKFLOW_PATH=.github/workflows/cdk-cli-blackbox.yml \
+        CDK_EVIDENCE_RUN_ID="$run_id" \
+        CDK_EVIDENCE_RUN_ATTEMPT="$run_attempt" \
         FILESYSTEM_ROOT="$sandbox_gate_root/filesystem" \
         PYTHONDONTWRITEBYTECODE=1 \
         PYTHONNOUSERSITE=1 \
