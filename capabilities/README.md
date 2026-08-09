@@ -163,6 +163,16 @@ Promotion must pass both the closed JSON Schema and the scenario runtime
 validator, which enforces cross-field run, platform, and command relationships
 that JSON Schema cannot express by itself.
 
+The Python `synth-python-minimal-sqs-v1` follow-up is deliberately diagnostic.
+It uses the already pinned Python CDK packages and default stack synthesizer to
+synthesize one L1 SQS resource through the real CLI, with no user-authored file
+or Docker assets, lookups, deployment, or external egress. The default
+synthesizer's stack-template asset manifest is closed explicitly. The emitted
+assembly is bounded and structurally validated, but its standalone JUnit is
+not compatibility evidence. A separate native
+amd64/arm64 receipt, aggregate, attestation, and review are required before the
+manifest can record Python or Cloud Assembly support.
+
 Ingestion is allowed only after offline bundle verification pins every signer
 boundary used by this record:
 

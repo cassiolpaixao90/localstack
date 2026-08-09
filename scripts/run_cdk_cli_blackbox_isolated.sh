@@ -139,6 +139,12 @@ case "$mode" in
     .venv/bin/python tests/aws/cli/validate_junit.py \
       --scenario bootstrap-upgrade-v28-v32 \
       "$GATE_ROOT/pytest-junit-cdk-bootstrap-upgrade-$RESULT_ARCH.xml"
+    .venv/bin/python -m pytest -q \
+      --junitxml="$GATE_ROOT/pytest-junit-cdk-python-synth-$RESULT_ARCH.xml" \
+      tests/aws/cli/test_cdk_cli_python_synth.py::test_cdk_cli_synthesizes_minimal_python_sqs_app
+    .venv/bin/python tests/aws/cli/validate_junit.py \
+      --scenario synth-python-minimal-sqs-v1 \
+      "$GATE_ROOT/pytest-junit-cdk-python-synth-$RESULT_ARCH.xml"
     ;;
   *)
     echo "usage: $0 {enter|run}" >&2

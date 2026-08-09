@@ -135,6 +135,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Archive Python synth diagnostic
+        if: success() || failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: diagnostic-cdk-python-synth-${{ matrix.arch }}
+          path: target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml
+          if-no-files-found: error
+          retention-days: 30
+
   cdk-cli-blackbox-complete:
     name: CDK CLI Black-box (matrix complete)
     if: always()

@@ -15,6 +15,10 @@ EXPECTED_TESTS = {
         "tests.aws.cli.test_cdk_cli_bootstrap_upgrade",
         "test_cdk_cli_upgrades_api_v28_to_builtin_v32",
     ),
+    "synth-python-minimal-sqs-v1": (
+        "tests.aws.cli.test_cdk_cli_python_synth",
+        "test_cdk_cli_synthesizes_minimal_python_sqs_app",
+    ),
 }
 
 

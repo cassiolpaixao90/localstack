@@ -538,6 +538,19 @@ validation. The remaining bootstrap gap is `clean-bootstrap-create-cli-not-run`;
 Cloud Assembly, application deployment, assets, language bindings, and parity
 remain unproven.
 
+The next diagnostic is the first real language-binding boundary. It invokes
+the pinned CLI against a fixed Python app using `aws-cdk-lib` 2.241.0,
+`constructs` 10.5.1, and the default stack synthesizer with one L1
+`AWS::SQS::Queue` and no user-authored file or Docker assets. The gate closes
+the default stack-template asset manifest and requires a bounded,
+regular-file-only Cloud Assembly, validates its emitted schema version, and
+closes the template and construct-tree shape. It runs without lookups,
+user-authored file or Docker assets, CloudFormation resource path metadata,
+external egress, or deployment. Its JUnit is archived separately from both
+retained bootstrap evidence streams. Until a later two-platform receipt, attestation,
+and reviewed promotion exists, this remains diagnostic and does not promote
+Python, `synth`, Cloud Assembly, SQS deployment, or any other language binding.
+
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK
 2.177.0 or later, endpoint environment injection, and paid-plan asset

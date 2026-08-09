@@ -176,10 +176,6 @@ def pinned_cdk_cli_runtime(tmp_path, account_id, region_name):
         assert {name for _, name in socket.if_nameindex()} == {"lo"}
     elif os.name != "posix":
         pytest.skip("the CDK process-group supervisor requires POSIX")
-    _require(
-        is_v2_engine(), "the CDK bootstrap upgrade requires CloudFormation v2", required=required
-    )
-
     node = shutil.which("node")
     _require(node is not None, "the pinned Node executable is not installed", required=required)
     assert node is not None
@@ -285,6 +281,11 @@ def cdk_v28_stack(
     account_id,
     region_name,
 ):
+    _require(
+        is_v2_engine(),
+        "the CDK bootstrap upgrade requires CloudFormation v2",
+        required=_REQUIRED,
+    )
     qualifier = short_uid()[:10]
     stack_name = f"CDKToolkit-{short_uid()}"
     bucket_name = f"cdk-{qualifier}-assets-{account_id}-{region_name}"

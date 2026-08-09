@@ -22,7 +22,7 @@ from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import (
 from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import (
     _validate_required_target as _validate_bootstrap_upgrade_target,
 )
-from tests.aws.cli.validate_junit import MAX_JUNIT_BYTES, validate_junit
+from tests.aws.cli.validate_junit import EXPECTED_TESTS, MAX_JUNIT_BYTES, validate_junit
 
 PROJECT_ROOT = Path(__file__).parents[3]
 TOOLCHAIN_ROOT = PROJECT_ROOT / "tests/aws/cli"
@@ -220,6 +220,34 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     )
 
 
+def test_cdk_python_synth_diagnostic_is_separate_and_closed():
+    workflow = _load_bounded_yaml(WORKFLOW_PATH.read_text())
+    job = workflow["jobs"]["cdk-cli-blackbox"]
+    steps = {step["name"]: step for step in job["steps"]}
+    isolated_runner = ISOLATED_RUNNER_PATH.read_text()
+
+    assert EXPECTED_TESTS["synth-python-minimal-sqs-v1"] == (
+        "tests.aws.cli.test_cdk_cli_python_synth",
+        "test_cdk_cli_synthesizes_minimal_python_sqs_app",
+    )
+    assert (
+        "tests/aws/cli/test_cdk_cli_python_synth.py::"
+        "test_cdk_cli_synthesizes_minimal_python_sqs_app" in isolated_runner
+    )
+    assert "pytest-junit-cdk-python-synth-$RESULT_ARCH.xml" in isolated_runner
+    assert "--scenario synth-python-minimal-sqs-v1" in isolated_runner
+
+    diagnostic = steps["Archive Python synth diagnostic"]
+    assert diagnostic["uses"] == (
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    )
+    assert diagnostic["with"]["name"] == "diagnostic-cdk-python-synth-${{ matrix.arch }}"
+    assert "test-results-cdk-cli-" not in diagnostic["with"]["name"]
+    assert "test-results-cdk-bootstrap-upgrade-" not in diagnostic["with"]["name"]
+    assert diagnostic["with"]["if-no-files-found"] == "error"
+    assert "pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml" in diagnostic["with"]["path"]
+
+
 def test_required_cdk_cli_gate_rejects_external_network_interfaces():
     _validate_required_network_isolation(False, "darwin", {"lo0", "en0"})
     _validate_required_network_isolation(True, "linux", {"lo"})
@@ -335,6 +363,19 @@ def test_cdk_cli_junit_validator_accepts_exact_bootstrap_upgrade_pass(tmp_path):
     )
 
     validate_junit(report, scenario="bootstrap-upgrade-v28-v32")
+
+
+def test_cdk_cli_junit_validator_accepts_exact_python_synth_pass(tmp_path):
+    report = tmp_path / "report.xml"
+    report.write_text(
+        '<testsuites tests="1" failures="0" errors="0" skipped="0">'
+        '<testsuite name="cdk-python-synth" tests="1" failures="0" errors="0" skipped="0">'
+        '<testcase classname="tests.aws.cli.test_cdk_cli_python_synth" '
+        'name="test_cdk_cli_synthesizes_minimal_python_sqs_app" />'
+        "</testsuite></testsuites>"
+    )
+
+    validate_junit(report, scenario="synth-python-minimal-sqs-v1")
 
 
 def test_cdk_cli_junit_validator_rejects_oversize_and_fifo_without_blocking(tmp_path):
