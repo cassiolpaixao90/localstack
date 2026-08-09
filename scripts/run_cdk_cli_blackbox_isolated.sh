@@ -91,7 +91,11 @@ case "$mode" in
       exit 1
     fi
 
-    readonly interfaces="$(find /sys/class/net -mindepth 1 -maxdepth 1 -printf '%f\n')"
+    if ! interfaces="$(ip -o link show | awk -F': ' '{print $2}')"; then
+      echo "failed to enumerate network interfaces" >&2
+      exit 1
+    fi
+    readonly interfaces
     if [[ "$interfaces" != "lo" ]]; then
       echo "unexpected network interfaces: $interfaces" >&2
       exit 1

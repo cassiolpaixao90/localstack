@@ -106,6 +106,11 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert 'if [[ -w "$WORKSPACE" ]]' in isolated_runner
     assert "/home/runner/work/_temp/_runner_file_commands" in isolated_runner
     assert "find /run /tmp -type s" in isolated_runner
+    assert "ip -o link show" in isolated_runner
+    assert "/sys/class/net" not in isolated_runner
+    assert "sub(/@.*/" not in isolated_runner
+    assert 'readonly interfaces="$' not in isolated_runner
+    assert "readonly interfaces" in isolated_runner
     assert steps["Archive JUnit result"]["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     )
