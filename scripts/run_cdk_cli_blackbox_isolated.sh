@@ -28,6 +28,7 @@ case "$mode" in
     readonly sandbox_gate_root="/mnt/localstack-cdk-gate"
 
     chmod -R o+rX,o-w "$workspace"
+    mkdir -p "$gate_root/filesystem/usr/lib/localstack"
     chown -R "$sandbox_uid:$sandbox_gid" "$gate_root"
     chmod 0755 "$gate_root" "$gate_root/home" "$gate_root/tmp"
     mount --make-rprivate /
@@ -56,6 +57,7 @@ case "$mode" in
         RESULT_ARCH="$result_arch" \
         CDK_EXPECTED_MACHINE_ARCH="$machine_arch" \
         CDK_EXPECTED_NODE_ARCH="$node_arch" \
+        FILESYSTEM_ROOT="$sandbox_gate_root/filesystem" \
         PYTHONDONTWRITEBYTECODE=1 \
         PYTHONNOUSERSITE=1 \
         PYTHONPATH="$sandbox_workspace/localstack-core" \

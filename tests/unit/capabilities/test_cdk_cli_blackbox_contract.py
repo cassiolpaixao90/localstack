@@ -83,6 +83,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
 
     isolated_runner = ISOLATED_RUNNER_PATH.read_text()
     assert 'chmod -R o+rX,o-w "$workspace"' in isolated_runner
+    assert 'mkdir -p "$gate_root/filesystem/usr/lib/localstack"' in isolated_runner
     assert 'mount --bind "$workspace" "$sandbox_workspace"' in isolated_runner
     assert 'mount -o remount,bind,ro,nosuid,nodev "$sandbox_workspace"' in isolated_runner
     assert 'mount --bind "$gate_root" "$sandbox_gate_root"' in isolated_runner
@@ -102,6 +103,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert "env -i" in isolated_runner
     assert 'PATH="$node_dir:/usr/sbin:/usr/bin:/sbin:/bin"' in isolated_runner
     assert 'PYTHONPATH="$sandbox_workspace/localstack-core"' in isolated_runner
+    assert 'FILESYSTEM_ROOT="$sandbox_gate_root/filesystem"' in isolated_runner
     assert "TEST_TARGET=LOCALSTACK" in isolated_runner
     assert "CDK_REAL_CLI_REQUIRED=1" in isolated_runner
     assert 'if [[ -w "$WORKSPACE" ]]' in isolated_runner
