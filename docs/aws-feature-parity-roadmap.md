@@ -501,6 +501,17 @@ manifest therefore records `bootstrap-show-template-v32` as a language-neutral
 the broad bootstrap status or satisfy the deploy, Cloud Assembly, language, or
 AWS differential gates.
 
+The next diagnostic gate seeds the pinned official bootstrap v28 template
+through the LocalStack CloudFormation API and then invokes the same pinned real
+CDK CLI with its built-in v32 template. It uses a unique toolkit stack and
+qualifier, verifies the in-place stack and IAM role identities, preserves an
+externally attached policy, checks the v32 trust/inline/managed-policy deltas,
+and requires strict stack, bucket, role, and SSM cleanup. This runs as a second
+JUnit result in the isolated amd64/arm64 matrix without changing the retained
+`bootstrap-show-template-v32` receipt or attestation. Until the deployment
+scenario has its own content-addressed two-platform evidence and reviewed
+promotion commit, `bootstrap-deployment-cli-not-run` remains an active gap.
+
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK
 2.177.0 or later, endpoint environment injection, and paid-plan asset

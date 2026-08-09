@@ -114,9 +114,17 @@ case "$mode" in
     fi
 
     cd "$WORKSPACE"
-    exec .venv/bin/python -m pytest -q \
+    .venv/bin/python -m pytest -q \
       --junitxml="$GATE_ROOT/pytest-junit-cdk-cli-$RESULT_ARCH.xml" \
-      tests/aws/cli/test_cdk_cli_blackbox.py
+      tests/aws/cli/test_cdk_cli_blackbox.py::test_cdk_cli_bootstrap_show_template_matches_pinned_v32
+    .venv/bin/python tests/aws/cli/validate_junit.py \
+      "$GATE_ROOT/pytest-junit-cdk-cli-$RESULT_ARCH.xml"
+    .venv/bin/python -m pytest -q \
+      --junitxml="$GATE_ROOT/pytest-junit-cdk-bootstrap-upgrade-$RESULT_ARCH.xml" \
+      tests/aws/cli/test_cdk_cli_bootstrap_upgrade.py::test_cdk_cli_upgrades_api_v28_to_builtin_v32
+    .venv/bin/python tests/aws/cli/validate_junit.py \
+      --scenario bootstrap-upgrade-v28-v32 \
+      "$GATE_ROOT/pytest-junit-cdk-bootstrap-upgrade-$RESULT_ARCH.xml"
     ;;
   *)
     echo "usage: $0 {enter|run}" >&2

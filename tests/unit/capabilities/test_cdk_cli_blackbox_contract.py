@@ -10,6 +10,18 @@ from tests.aws.cli.test_cdk_cli_blackbox import (
     _validate_required_network_isolation,
     _validate_required_target,
 )
+from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import (
+    _attach_external_policy,
+    _load_template_body,
+    _validate_role_names,
+    _validated_role_identities,
+)
+from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import (
+    _require as _require_bootstrap_upgrade,
+)
+from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import (
+    _validate_required_target as _validate_bootstrap_upgrade_target,
+)
 from tests.aws.cli.validate_junit import MAX_JUNIT_BYTES, validate_junit
 
 PROJECT_ROOT = Path(__file__).parents[3]
@@ -49,6 +61,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert workflow[True] == {"push": {"branches": ["main"]}}
     assert workflow["permissions"] == {"contents": "read"}
     assert job["strategy"]["fail-fast"] is False
+    assert job["timeout-minutes"] == 15
     assert job["strategy"]["matrix"]["include"] == [
         {
             "runner": "ubuntu-24.04",
@@ -76,7 +89,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
         "package-manager-cache": "false",
     }
     isolated_run = steps["Run CDK gate without external egress"]["run"]
-    assert "sudo timeout" in isolated_run
+    assert "sudo timeout --signal=TERM --kill-after=10s 420s" in isolated_run
     assert "unshare --net --pid --fork --kill-child=KILL --mount-proc" in isolated_run
     assert "scripts/run_cdk_cli_blackbox_isolated.sh" in isolated_run
     assert 'sudo chown -R "$host_uid:$host_gid" "$gate_root"' in isolated_run
@@ -107,6 +120,16 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert 'CDK_EXECUTION_RECEIPT="$sandbox_gate_root/cdk-execution-receipt-$result_arch.json"' in (
         isolated_runner
     )
+    assert (
+        "tests/aws/cli/test_cdk_cli_blackbox.py::"
+        "test_cdk_cli_bootstrap_show_template_matches_pinned_v32" in isolated_runner
+    )
+    assert (
+        "tests/aws/cli/test_cdk_cli_bootstrap_upgrade.py::"
+        "test_cdk_cli_upgrades_api_v28_to_builtin_v32" in isolated_runner
+    )
+    assert "pytest-junit-cdk-bootstrap-upgrade-$RESULT_ARCH.xml" in isolated_runner
+    assert "--scenario bootstrap-upgrade-v28-v32" in isolated_runner
     assert "TEST_TARGET=LOCALSTACK" in isolated_runner
     assert "CDK_REAL_CLI_REQUIRED=1" in isolated_runner
     assert 'if [[ -w "$WORKSPACE" ]]' in isolated_runner
@@ -120,6 +143,13 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert steps["Archive lane result"]["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     )
+    diagnostic = steps["Archive bootstrap upgrade diagnostic"]
+    assert diagnostic["uses"] == (
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    )
+    assert diagnostic["with"]["name"] == "diagnostic-cdk-bootstrap-upgrade-${{ matrix.arch }}"
+    assert "test-results-cdk-cli-" not in diagnostic["with"]["name"]
+    assert diagnostic["with"]["if-no-files-found"] == "error"
     assert steps["Reject workflow reruns"]["run"] == 'test "${{ github.run_attempt }}" = 1'
 
     aggregator = workflow["jobs"]["cdk-cli-blackbox-complete"]
@@ -155,6 +185,55 @@ def test_required_cdk_cli_gate_rejects_external_network_interfaces():
         _validate_required_network_isolation(True, "linux", {"eth0", "lo"})
     with pytest.raises(pytest.UsageError, match="only the loopback interface"):
         _validate_required_network_isolation(True, "darwin", {"lo0"})
+
+
+def test_optional_bootstrap_upgrade_skips_missing_prerequisites():
+    with pytest.raises(pytest.skip.Exception, match="missing toolchain"):
+        _require_bootstrap_upgrade(False, "missing toolchain", required=False)
+    with pytest.raises(pytest.fail.Exception, match="missing toolchain"):
+        _require_bootstrap_upgrade(False, "missing toolchain", required=True)
+
+
+@pytest.mark.parametrize("test_target", [None, "AWS_CLOUD"])
+def test_required_bootstrap_upgrade_cannot_be_skipped_by_target_marker(test_target):
+    with pytest.raises(pytest.UsageError, match="TEST_TARGET=LOCALSTACK"):
+        _validate_bootstrap_upgrade_target(True, test_target)
+
+
+def test_bootstrap_upgrade_journals_external_policy_before_write():
+    journal = []
+
+    class Iam:
+        @staticmethod
+        def attach_role_policy(**kwargs):
+            raise RuntimeError(f"response lost after applying {kwargs['PolicyArn']}")
+
+    with pytest.raises(RuntimeError, match="response lost"):
+        _attach_external_policy(Iam(), journal, "role", "arn:policy")
+
+    assert journal == [("role", "arn:policy")]
+
+
+def test_bootstrap_upgrade_rejects_ambiguous_template_and_malformed_role_identity():
+    with pytest.raises(ValueError, match="duplicate mapping key"):
+        _load_template_body("Resources: {Expected: first}\nResources: {Expected: second}\n")
+
+    role_names = {
+        "CloudFormationExecutionRole": "shared",
+        "DeploymentActionRole": "shared",
+        "FilePublishingRole": "file",
+        "ImagePublishingRole": "image",
+        "LookupRole": "lookup",
+    }
+    with pytest.raises(ValueError, match="non-empty and unique"):
+        _validate_role_names(role_names)
+
+    malformed_roles = {
+        logical_id: {"Arn": f"arn:aws:iam::000000000000:role/{logical_id}"}
+        for logical_id in role_names
+    }
+    with pytest.raises(ValueError, match="identity is malformed"):
+        _validated_role_identities(malformed_roles)
 
 
 @pytest.mark.parametrize("test_target", [None, "AWS_CLOUD"])
@@ -200,6 +279,19 @@ def test_cdk_cli_junit_validator_accepts_exact_pass(tmp_path):
     )
 
     validate_junit(report)
+
+
+def test_cdk_cli_junit_validator_accepts_exact_bootstrap_upgrade_pass(tmp_path):
+    report = tmp_path / "report.xml"
+    report.write_text(
+        '<testsuites tests="1" failures="0" errors="0" skipped="0">'
+        '<testsuite name="cdk-bootstrap-upgrade" tests="1" failures="0" errors="0" skipped="0">'
+        '<testcase classname="tests.aws.cli.test_cdk_cli_bootstrap_upgrade" '
+        'name="test_cdk_cli_upgrades_api_v28_to_builtin_v32" />'
+        "</testsuite></testsuites>"
+    )
+
+    validate_junit(report, scenario="bootstrap-upgrade-v28-v32")
 
 
 def test_cdk_cli_junit_validator_rejects_oversize_and_fifo_without_blocking(tmp_path):

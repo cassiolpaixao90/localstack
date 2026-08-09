@@ -12,7 +12,7 @@ jobs:
   cdk-cli-blackbox:
     name: CDK CLI Black-box (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -69,7 +69,7 @@ jobs:
           mkdir -p "$gate_root/home" "$gate_root/tmp"
 
           set +e
-          sudo timeout --signal=TERM --kill-after=10s 240s \
+          sudo timeout --signal=TERM --kill-after=10s 420s \
             unshare --net --pid --fork --kill-child=KILL --mount-proc -- \
               "$PWD/scripts/run_cdk_cli_blackbox_isolated.sh" enter \
               "$sandbox_uid" \
@@ -99,6 +99,15 @@ jobs:
             target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-cli-${{ matrix.arch }}.xml
             target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-execution-receipt-${{ matrix.arch }}.json
           if-no-files-found: warn
+          retention-days: 30
+
+      - name: Archive bootstrap upgrade diagnostic
+        if: success() || failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: diagnostic-cdk-bootstrap-upgrade-${{ matrix.arch }}
+          path: target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-bootstrap-upgrade-${{ matrix.arch }}.xml
+          if-no-files-found: error
           retention-days: 30
 
   cdk-cli-blackbox-complete:
