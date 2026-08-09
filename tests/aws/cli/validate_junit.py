@@ -1,4 +1,6 @@
 import argparse
+import os
+import stat
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -16,8 +18,7 @@ def _required_count(element: ET.Element, name: str, expected: int) -> None:
         raise ValueError(f"JUnit {element.tag} expected {name}={expected}, got {actual}")
 
 
-def validate_junit(path: Path) -> None:
-    payload = path.read_bytes()
+def validate_junit_payload(payload: bytes) -> None:
     if not payload or len(payload) > MAX_JUNIT_BYTES:
         raise ValueError("JUnit report size is outside the accepted bounds")
     if b"<!DOCTYPE" in payload.upper():
@@ -43,6 +44,27 @@ def validate_junit(path: Path) -> None:
         raise ValueError("JUnit report contains an unexpected test name")
     if list(testcase):
         raise ValueError("JUnit test case contains a non-passing outcome")
+
+
+def load_junit(path: Path) -> bytes:
+    flags = os.O_RDONLY
+    for name in ("O_BINARY", "O_CLOEXEC", "O_NONBLOCK", "O_NOFOLLOW"):
+        flags |= getattr(os, name, 0)
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise ValueError("JUnit report must be a regular file")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = -1
+            payload = stream.read(MAX_JUNIT_BYTES + 1)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    return payload
+
+
+def validate_junit(path: Path) -> None:
+    validate_junit_payload(load_junit(path))
 
 
 def main() -> int:

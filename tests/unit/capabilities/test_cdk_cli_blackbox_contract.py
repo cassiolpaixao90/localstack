@@ -10,7 +10,7 @@ from tests.aws.cli.test_cdk_cli_blackbox import (
     _validate_required_network_isolation,
     _validate_required_target,
 )
-from tests.aws.cli.validate_junit import validate_junit
+from tests.aws.cli.validate_junit import MAX_JUNIT_BYTES, validate_junit
 
 PROJECT_ROOT = Path(__file__).parents[3]
 TOOLCHAIN_ROOT = PROJECT_ROOT / "tests/aws/cli"
@@ -104,6 +104,9 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert 'PATH="$node_dir:/usr/sbin:/usr/bin:/sbin:/bin"' in isolated_runner
     assert 'PYTHONPATH="$sandbox_workspace/localstack-core"' in isolated_runner
     assert 'FILESYSTEM_ROOT="$sandbox_gate_root/filesystem"' in isolated_runner
+    assert 'CDK_EXECUTION_RECEIPT="$sandbox_gate_root/cdk-execution-receipt-$result_arch.json"' in (
+        isolated_runner
+    )
     assert "TEST_TARGET=LOCALSTACK" in isolated_runner
     assert "CDK_REAL_CLI_REQUIRED=1" in isolated_runner
     assert 'if [[ -w "$WORKSPACE" ]]' in isolated_runner
@@ -114,9 +117,10 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert "sub(/@.*/" not in isolated_runner
     assert 'readonly interfaces="$' not in isolated_runner
     assert "readonly interfaces" in isolated_runner
-    assert steps["Archive JUnit result"]["uses"] == (
+    assert steps["Archive lane result"]["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     )
+    assert steps["Reject workflow reruns"]["run"] == 'test "${{ github.run_attempt }}" = 1'
 
     aggregator = workflow["jobs"]["cdk-cli-blackbox-complete"]
     assert aggregator["needs"] == "cdk-cli-blackbox"
@@ -124,10 +128,23 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert aggregate_steps["Download architecture results"]["uses"] == (
         "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
     )
+    assert aggregate_steps["Download architecture results"]["with"]["merge-multiple"] is False
     aggregate_run = aggregate_steps["Require the complete passing matrix"]["run"]
+    assert 'test "${#downloaded[@]}" -eq 4' in aggregate_run
     assert 'test "${#reports[@]}" -eq 2' in aggregate_run
     assert "pytest-junit-cdk-cli-amd64.xml" in aggregate_run
     assert "pytest-junit-cdk-cli-arm64.xml" in aggregate_run
+    assert 'test "${{ github.run_attempt }}" = 1' in aggregate_run
+    assert aggregate_steps["Attest candidate evidence"]["uses"] == (
+        "actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26"
+    )
+    assert aggregator["permissions"] == {
+        "contents": "read",
+        "id-token": "write",
+        "attestations": "write",
+        "artifact-metadata": "write",
+    }
+    assert aggregate_steps["Archive candidate evidence"]["with"]["retention-days"] == 90
 
 
 def test_required_cdk_cli_gate_rejects_external_network_interfaces():
@@ -183,6 +200,20 @@ def test_cdk_cli_junit_validator_accepts_exact_pass(tmp_path):
     )
 
     validate_junit(report)
+
+
+def test_cdk_cli_junit_validator_rejects_oversize_and_fifo_without_blocking(tmp_path):
+    oversized = tmp_path / "oversized.xml"
+    oversized.write_bytes(b" " * (MAX_JUNIT_BYTES + 1))
+    fifo = tmp_path / "report.fifo"
+    import os
+
+    os.mkfifo(fifo)
+
+    with pytest.raises(ValueError, match="size"):
+        validate_junit(oversized)
+    with pytest.raises(ValueError, match="regular file"):
+        validate_junit(fifo)
 
 
 @pytest.mark.parametrize(

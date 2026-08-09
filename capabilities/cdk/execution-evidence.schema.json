@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://localstack.cloud/schemas/cdk-execution-evidence-v1.json",
+  "title": "LocalStack CDK execution evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "mode",
+    "evidence_id",
+    "claim_id",
+    "subject",
+    "run",
+    "scenario",
+    "toolchain",
+    "harness",
+    "lanes",
+    "promotion"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "record_type": {"const": "aggregate"},
+    "mode": {"const": "candidate"},
+    "evidence_id": {"$ref": "#/$defs/sha256"},
+    "claim_id": {"$ref": "#/$defs/sha256"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "commit_sha", "ref"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1, "maxLength": 256},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "ref": {"const": "refs/heads/main"}
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "workflow_path", "run_id", "run_attempt", "event"],
+      "properties": {
+        "provider": {"const": "github-actions"},
+        "workflow_path": {"const": ".github/workflows/cdk-cli-blackbox.yml"},
+        "run_id": {"type": "integer", "minimum": 1},
+        "run_attempt": {"const": 1},
+        "event": {"const": "push"}
+      }
+    },
+    "scenario": {"$ref": "#/$defs/scenario"},
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_version",
+        "cdk_cli_version",
+        "bootstrap_version",
+        "reference_template_byte_sha256",
+        "template_semantic_sha256",
+        "npm_integrity"
+      ],
+      "properties": {
+        "node_version": {"const": "22.23.2"},
+        "cdk_cli_version": {"const": "2.1135.1"},
+        "bootstrap_version": {"const": 32},
+        "reference_template_byte_sha256": {
+          "const": "sha256:a484ad768d3446874161044d986bec096e201a54037c8ce93ed5a0d215e1dd25"
+        },
+        "template_semantic_sha256": {
+          "const": "sha256:9e04a3226e702258e2ba13063dc6ecbc6fba7880d9fa27298445499db453013a"
+        },
+        "npm_integrity": {
+          "const": "sha512-g1jcMfWlyYtGamFJ/kPBOCuchl3NfwTF2UwOLTIDN0nJbGm84EAO+c8DlYnaemM8UmKFkdoq4BGdmiNL5nHWwA=="
+        }
+      }
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_sha256"],
+      "properties": {
+        "input_sha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            ".github/workflows/cdk-cli-blackbox.yml",
+            ".python-version",
+            "Makefile",
+            "capabilities/cdk/compatibility.json",
+            "capabilities/cdk/execution-evidence.schema.json",
+            "localstack-core/localstack/cli/_cdk_health_probe.py",
+            "localstack-core/localstack/cli/cdk.py",
+            "pyproject.toml",
+            "requirements-test.txt",
+            "scripts/run_cdk_cli_blackbox_isolated.sh",
+            "tests/aws/cli/execution_evidence.py",
+            "tests/aws/cli/package-lock.json",
+            "tests/aws/cli/package.json",
+            "tests/aws/cli/test_cdk_cli_blackbox.py",
+            "tests/aws/cli/validate_junit.py",
+            "tests/aws/templates/cdk_bootstrap_v32.yaml"
+          ],
+          "properties": {
+            ".github/workflows/cdk-cli-blackbox.yml": {"$ref": "#/$defs/sha256"},
+            ".python-version": {"$ref": "#/$defs/sha256"},
+            "Makefile": {"$ref": "#/$defs/sha256"},
+            "capabilities/cdk/compatibility.json": {"$ref": "#/$defs/sha256"},
+            "capabilities/cdk/execution-evidence.schema.json": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/cli/_cdk_health_probe.py": {"$ref": "#/$defs/sha256"},
+            "localstack-core/localstack/cli/cdk.py": {"$ref": "#/$defs/sha256"},
+            "pyproject.toml": {"$ref": "#/$defs/sha256"},
+            "requirements-test.txt": {"$ref": "#/$defs/sha256"},
+            "scripts/run_cdk_cli_blackbox_isolated.sh": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/execution_evidence.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/package-lock.json": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/package.json": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/test_cdk_cli_blackbox.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/cli/validate_junit.py": {"$ref": "#/$defs/sha256"},
+            "tests/aws/templates/cdk_bootstrap_v32.yaml": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    },
+    "lanes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "allOf": [
+            {"$ref": "#/$defs/lane"},
+            {
+              "properties": {
+                "platform_id": {"const": "linux-amd64"},
+                "machine_arch": {"const": "x86_64"},
+                "node_arch": {"const": "x64"}
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {"$ref": "#/$defs/lane"},
+            {
+              "properties": {
+                "platform_id": {"const": "linux-arm64"},
+                "machine_arch": {"const": "aarch64"},
+                "node_arch": {"const": "arm64"}
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eligible", "blockers"],
+      "properties": {
+        "eligible": {"const": false},
+        "blockers": {
+          "const": [
+            "no-bootstrap-deploy",
+            "no-cloud-assembly",
+            "no-language-binding",
+            "no-aws-differential"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "result",
+        "construct_language",
+        "cloud_assembly_produced",
+        "resource_deployment_performed",
+        "aws_differential"
+      ],
+      "properties": {
+        "id": {"const": "bootstrap-show-template-v32"},
+        "result": {"const": "cli-pass"},
+        "construct_language": {"type": "null"},
+        "cloud_assembly_produced": {"const": false},
+        "resource_deployment_performed": {"const": false},
+        "aws_differential": {"const": false}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "returncode",
+        "timed_out",
+        "duration_ms",
+        "stdout_bytes",
+        "stderr_bytes",
+        "stdout_sha256",
+        "stderr_sha256",
+        "stdout_truncated",
+        "stderr_truncated"
+      ],
+      "properties": {
+        "status": {"const": "pass"},
+        "returncode": {"const": 0},
+        "timed_out": {"const": false},
+        "duration_ms": {"type": "integer", "minimum": 0, "maximum": 300000},
+        "stdout_bytes": {"type": "integer", "minimum": 0, "maximum": 16777216},
+        "stderr_bytes": {"type": "integer", "minimum": 0, "maximum": 16777216},
+        "stdout_sha256": {"$ref": "#/$defs/sha256"},
+        "stderr_sha256": {"$ref": "#/$defs/sha256"},
+        "stdout_truncated": {"const": false},
+        "stderr_truncated": {"const": false}
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_id", "interface_names"],
+      "properties": {
+        "profile_id": {"const": "linux-net-pid-mount-nobody-v1"},
+        "interface_names": {"const": ["lo"]}
+      }
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "platform_id",
+        "machine_arch",
+        "node_arch",
+        "python_version",
+        "kernel_release",
+        "receipt_id",
+        "observed_at",
+        "junit_sha256",
+        "junit_bytes",
+        "result",
+        "isolation"
+      ],
+      "properties": {
+        "platform_id": {"enum": ["linux-amd64", "linux-arm64"]},
+        "machine_arch": {"type": "string", "minLength": 1, "maxLength": 32},
+        "node_arch": {"type": "string", "minLength": 1, "maxLength": 32},
+        "python_version": {"type": "string", "minLength": 1, "maxLength": 32},
+        "kernel_release": {"type": "string", "minLength": 1, "maxLength": 256},
+        "receipt_id": {"$ref": "#/$defs/sha256"},
+        "observed_at": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+        },
+        "junit_sha256": {"$ref": "#/$defs/sha256"},
+        "junit_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576},
+        "result": {"$ref": "#/$defs/result"},
+        "isolation": {"$ref": "#/$defs/isolation"}
+      }
+    }
+  }
+}

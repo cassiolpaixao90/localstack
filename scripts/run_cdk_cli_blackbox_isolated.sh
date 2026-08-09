@@ -55,6 +55,7 @@ case "$mode" in
         GATE_ROOT="$sandbox_gate_root" \
         WORKSPACE="$sandbox_workspace" \
         RESULT_ARCH="$result_arch" \
+        CDK_EXECUTION_RECEIPT="$sandbox_gate_root/cdk-execution-receipt-$result_arch.json" \
         CDK_EXPECTED_MACHINE_ARCH="$machine_arch" \
         CDK_EXPECTED_NODE_ARCH="$node_arch" \
         FILESYSTEM_ROOT="$sandbox_gate_root/filesystem" \

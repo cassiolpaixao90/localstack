@@ -123,7 +123,14 @@ template. A local run with a different Node version may set
 promotion evidence. This gate alone does not prove bootstrap deployment,
 Cloud Assembly generation, a language binding, or AWS parity, so the
 aggregate manifest remains unchanged until both post-merge platform runs
-produce attestable evidence.
+produce attestable evidence. Each required lane now emits a bounded,
+content-addressed receipt only after the last assertion. The aggregator rejects
+reruns, validates the exact amd64/arm64 pair and their JUnit reports, binds all
+relevant harness inputs, and creates a candidate JSON conforming to
+`cdk/execution-evidence.schema.json`. GitHub Actions attests that aggregate;
+the receipt remains ineligible for broad promotion because this client-side
+scenario performs no bootstrap deployment, produces no Cloud Assembly, tests
+no language binding, and contains no AWS differential result.
 
 The static provider inventory covers the providers declared by this checkout.
 Static classifications use the provider registered as `default`; the JSON also

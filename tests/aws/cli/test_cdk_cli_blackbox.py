@@ -5,6 +5,8 @@ import platform
 import shutil
 import socket
 import sys
+import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -19,12 +21,20 @@ from localstack.cli.cdk import (
     probe_localstack_health,
 )
 from localstack.testing.pytest import markers
+from tests.aws.cli.execution_evidence import (
+    MAX_EVIDENCE_BYTES,
+    create_lane_receipt,
+    write_canonical_json,
+)
 
 PROJECT_ROOT = Path(__file__).parents[3]
 TOOLCHAIN_ROOT = Path(__file__).parent
 PINNED_NODE_VERSION = "22.23.2"
 PINNED_CDK_VERSION = "2.1135.1"
 PINNED_BOOTSTRAP_VERSION = "32"
+PINNED_BOOTSTRAP_BYTE_SHA256 = (
+    "sha256:a484ad768d3446874161044d986bec096e201a54037c8ce93ed5a0d215e1dd25"
+)
 PINNED_BOOTSTRAP_SEMANTIC_SHA256 = (
     "9e04a3226e702258e2ba13063dc6ecbc6fba7880d9fa27298445499db453013a"
 )
@@ -116,10 +126,11 @@ def test_cdk_cli_bootstrap_show_template_matches_pinned_v32(
     region_name,
 ):
     _require(os.name == "posix", "the safe CDK supervisor requires POSIX")
+    interface_names = {name for _, name in socket.if_nameindex()}
     _validate_required_network_isolation(
         _REQUIRED,
         sys.platform,
-        {name for _, name in socket.if_nameindex()},
+        interface_names,
     )
     expected_machine_arch = os.environ.get("CDK_EXPECTED_MACHINE_ARCH")
     expected_node_arch = os.environ.get("CDK_EXPECTED_NODE_ARCH")
@@ -200,6 +211,7 @@ def test_cdk_cli_bootstrap_show_template_matches_pinned_v32(
         probe_cdk_cli_version(str(cdk_executable), environment=environment, cwd=workspace)
         == PINNED_CDK_VERSION
     )
+    started = time.monotonic_ns()
     result = launch_cdk(
         ["bootstrap", "--show-template", "--no-notices"],
         executable=str(cdk_executable),
@@ -208,6 +220,7 @@ def test_cdk_cli_bootstrap_show_template_matches_pinned_v32(
         timeout_seconds=30,
         max_output_bytes=1024 * 1024,
     )
+    duration_ms = (time.monotonic_ns() - started) // 1_000_000
 
     assert result.returncode == 0, result.stderr.decode(errors="replace")
     assert result.timed_out is False
@@ -224,3 +237,36 @@ def test_cdk_cli_bootstrap_show_template_matches_pinned_v32(
         == PINNED_BOOTSTRAP_VERSION
     )
     assert actual["Outputs"]["BootstrapVersion"]["Value"] == PINNED_BOOTSTRAP_VERSION
+
+    receipt_path = os.environ.get("CDK_EXECUTION_RECEIPT")
+    _require(
+        not _REQUIRED or receipt_path is not None,
+        "the required CDK gate needs an execution receipt path",
+    )
+    if receipt_path:
+        platform_id = f"linux-{os.environ['RESULT_ARCH']}"
+        receipt = create_lane_receipt(
+            platform_id=platform_id,
+            machine_arch=platform.machine(),
+            node_arch=node_arch_result.stdout.decode().strip(),
+            python_version=platform.python_version(),
+            kernel_release=platform.release(),
+            node_version=expected_node_version,
+            cdk_cli_version=PINNED_CDK_VERSION,
+            bootstrap_version=int(PINNED_BOOTSTRAP_VERSION),
+            reference_template_byte_sha256=PINNED_BOOTSTRAP_BYTE_SHA256,
+            template_semantic_sha256=f"sha256:{PINNED_BOOTSTRAP_SEMANTIC_SHA256}",
+            returncode=result.returncode,
+            timed_out=result.timed_out,
+            duration_ms=duration_ms,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            stdout_bytes=result.stdout_bytes,
+            stderr_bytes=result.stderr_bytes,
+            stdout_truncated=result.stdout_truncated,
+            stderr_truncated=result.stderr_truncated,
+            interface_names=sorted(interface_names),
+            isolation_profile_id="linux-net-pid-mount-nobody-v1",
+            observed_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        )
+        write_canonical_json(Path(receipt_path), receipt, MAX_EVIDENCE_BYTES)

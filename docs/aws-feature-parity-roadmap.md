@@ -479,6 +479,18 @@ both post-merge jobs produce attestable evidence, this remains diagnostic
 infrastructure: it does not set `real_cli_exercised`, remove
 `bootstrap-cli-not-run`, or promote any language.
 
+The workflow's evidence contract is deliberately two-phase. A first-attempt
+push to `main` must produce content-addressed lane receipts and exactly one
+aggregate for native Linux amd64 and arm64. The aggregate binds the source
+commit, workflow inputs, toolchain, semantic and byte template hashes, bounded
+output metadata, JUnit outcomes, and the declared isolation profile; it is
+then attested through the workflow's GitHub OIDC identity. This candidate does
+not update the compatibility manifest automatically. A separate reviewed
+commit must preserve and verify the aggregate and attestation before it may
+promote only the narrow `bootstrap-show-template-v32` subscenario. Bootstrap
+deployment, language bindings, Cloud Assembly, and AWS parity remain separate
+gates.
+
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK
 2.177.0 or later, endpoint environment injection, and paid-plan asset
