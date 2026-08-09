@@ -24,11 +24,18 @@ case "$mode" in
     readonly result_arch="$6"
     readonly machine_arch="$7"
     readonly node_arch="$8"
+    readonly sandbox_workspace="/mnt/localstack-cdk-workspace"
+    readonly sandbox_gate_root="/mnt/localstack-cdk-gate"
 
     chmod -R o+rX,o-w "$workspace"
     chown -R "$sandbox_uid:$sandbox_gid" "$gate_root"
     chmod 0755 "$gate_root" "$gate_root/home" "$gate_root/tmp"
     mount --make-rprivate /
+    mkdir -p "$sandbox_workspace" "$sandbox_gate_root"
+    mount --bind "$workspace" "$sandbox_workspace"
+    mount -o remount,bind,ro,nosuid,nodev "$sandbox_workspace"
+    mount --bind "$gate_root" "$sandbox_gate_root"
+    mount -o remount,bind,rw,nosuid,nodev "$sandbox_gate_root"
     mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run
     mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
     ip link set lo up
@@ -41,11 +48,11 @@ case "$mode" in
       --ambient-caps=-all \
       --bounding-set=-all \
       env -i \
-        HOME="$gate_root/home" \
-        TMPDIR="$gate_root/tmp" \
+        HOME="$sandbox_gate_root/home" \
+        TMPDIR="$sandbox_gate_root/tmp" \
         PATH="$node_dir:/usr/sbin:/usr/bin:/sbin:/bin" \
-        GATE_ROOT="$gate_root" \
-        WORKSPACE="$workspace" \
+        GATE_ROOT="$sandbox_gate_root" \
+        WORKSPACE="$sandbox_workspace" \
         RESULT_ARCH="$result_arch" \
         CDK_EXPECTED_MACHINE_ARCH="$machine_arch" \
         CDK_EXPECTED_NODE_ARCH="$node_arch" \
@@ -60,7 +67,7 @@ case "$mode" in
         AWS_SHARED_CREDENTIALS_FILE=/dev/null \
         DISABLE_EVENTS=1 \
         DNS_PORT=4513 \
-        /bin/bash "$workspace/scripts/run_cdk_cli_blackbox_isolated.sh" run
+        /bin/bash "$sandbox_workspace/scripts/run_cdk_cli_blackbox_isolated.sh" run
     ;;
   run)
     if [[ "$#" -ne 0 ]]; then
