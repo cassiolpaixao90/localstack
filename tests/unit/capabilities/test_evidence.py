@@ -8,10 +8,12 @@ import pytest
 from localstack.capabilities.evidence import (
     EvidenceError,
     EvidenceLimits,
-    build_evidence_bundle,
     classify_dispatch_trace,
     main,
     render_evidence,
+)
+from localstack.capabilities.evidence import (
+    build_evidence_bundle as _build_evidence_bundle,
 )
 
 
@@ -24,8 +26,49 @@ def _catalog():
     catalog = {
         "schema_version": 1,
         "model_catalog_sha256": "sha256:" + "1" * 64,
+        "source": {
+            "type": "botocore-service-model",
+            "version": "test",
+            "license": "Apache-2.0",
+            "uri": "https://example.invalid/botocore",
+        },
+        "classification": {
+            "method": "conservative-static-analysis",
+            "native_and_parity_require_runtime_evidence": True,
+            "statuses": [
+                "missing",
+                "scaffold",
+                "fallback",
+                "partial",
+                "native",
+                "parity-pass",
+            ],
+        },
+        "summary": {
+            "services": 1,
+            "operations": 1,
+            "generated_interfaces": 0,
+            "services_with_providers": 0,
+            "cloudformation_resources": 0,
+            "by_status": {
+                "missing": 0,
+                "scaffold": 0,
+                "fallback": 0,
+                "partial": 1,
+                "native": 0,
+                "parity-pass": 0,
+            },
+        },
+        "cloudformation": {"resources": []},
         "services": {
             "sample": {
+                "api_version": "2026-08-08",
+                "protocol": "json",
+                "model_sha256": "sha256:" + "2" * 64,
+                "generated_interface": None,
+                "providers": [],
+                "default_provider": None,
+                "cloudformation_resources": [],
                 "operation_statuses": {
                     "missing": [],
                     "scaffold": [],
@@ -33,12 +76,29 @@ def _catalog():
                     "partial": ["DoThing"],
                     "native": [],
                     "parity-pass": [],
-                }
+                },
+                "implementations": {
+                    "DoThing": {
+                        "origin": "native-candidate",
+                        "reasons": ["test-fixture"],
+                        "validation": {"status": "unverified", "evidence": []},
+                        "performance": {"profiles": []},
+                    }
+                },
             }
         },
     }
     catalog["inventory_sha256"] = _sha256(catalog)
     return catalog
+
+
+def build_evidence_bundle(catalog, metric_inputs, **kwargs):
+    return _build_evidence_bundle(
+        catalog,
+        metric_inputs,
+        expected_inventory_sha256=catalog["inventory_sha256"],
+        **kwargs,
+    )
 
 
 def _trace(origin="native", outcome="returned"):
@@ -196,6 +256,55 @@ def test_rejects_catalog_content_that_does_not_match_inventory_digest(tmp_path: 
         )
 
 
+def test_rejects_catalog_that_does_not_match_external_inventory_anchor(tmp_path: Path, monkeypatch):
+    from localstack.capabilities import evidence as evidence_module
+
+    metrics = tmp_path / "metrics.csv"
+    _write_metrics(metrics, [_row()])
+    catalog = _catalog()
+    expected_inventory_sha256 = catalog["inventory_sha256"]
+    implementation = catalog["services"]["sample"]["implementations"].pop("DoThing")
+    catalog["services"]["sample"]["implementations"]["Invented"] = implementation
+    catalog["services"]["sample"]["operation_statuses"]["partial"] = ["Invented"]
+    catalog["inventory_sha256"] = _sha256(
+        {key: value for key, value in catalog.items() if key != "inventory_sha256"}
+    )
+    monkeypatch.setattr(
+        evidence_module,
+        "_catalog_validator",
+        lambda: pytest.fail("schema validation must not run before the trusted anchor matches"),
+    )
+
+    with pytest.raises(EvidenceError, match="does not match the expected inventory digest"):
+        _build_evidence_bundle(
+            catalog,
+            [metrics],
+            observed_at="2026-08-08T18:00:00Z",
+            source_commit="5" * 40,
+            expected_inventory_sha256=expected_inventory_sha256,
+        )
+
+
+def test_rejects_catalog_that_violates_closed_schema(tmp_path: Path):
+    metrics = tmp_path / "metrics.csv"
+    _write_metrics(metrics, [_row()])
+    catalog = _catalog()
+    catalog["unexpected"] = True
+    catalog["inventory_sha256"] = _sha256(
+        {key: value for key, value in catalog.items() if key != "inventory_sha256"}
+    )
+
+    with pytest.raises(EvidenceError, match="does not match the closed schema") as error:
+        _build_evidence_bundle(
+            catalog,
+            [metrics],
+            observed_at="2026-08-08T18:00:00Z",
+            source_commit="5" * 40,
+            expected_inventory_sha256=catalog["inventory_sha256"],
+        )
+    assert len(str(error.value)) < 100
+
+
 def test_rejects_trace_over_limit(tmp_path: Path):
     metrics = tmp_path / "metrics.csv"
     trace = _trace() * (EvidenceLimits().max_trace_entries + 1)
@@ -287,6 +396,8 @@ def test_cli_writes_overlay_atomically(tmp_path: Path):
             "2026-08-08T18:00:00Z",
             "--source-commit",
             "3" * 40,
+            "--expected-inventory-sha256",
+            _catalog()["inventory_sha256"],
             "--output",
             str(output),
         ]
@@ -322,6 +433,8 @@ def test_cli_preserves_previous_output_when_atomic_replace_fails(tmp_path: Path,
             "2026-08-08T18:00:00Z",
             "--source-commit",
             "7" * 40,
+            "--expected-inventory-sha256",
+            _catalog()["inventory_sha256"],
             "--output",
             str(output),
         ]

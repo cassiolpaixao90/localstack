@@ -12,8 +12,12 @@ from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
+
+from jsonschema.exceptions import SchemaError, ValidationError
+from jsonschema.validators import validator_for
 
 EVIDENCE_SCHEMA_VERSION = 1
 TRACE_CLASSES = (
@@ -40,6 +44,7 @@ REQUIRED_METRIC_FIELDS = frozenset(
 )
 _SHA256_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+_CATALOG_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "capabilities/schema.json"
 
 
 class EvidenceError(ValueError):
@@ -192,18 +197,43 @@ def _parse_trace(raw: str, limits: EvidenceLimits) -> list[dict[str, str]]:
     return result
 
 
-def _catalog_operations(catalog: Mapping[str, Any]) -> set[tuple[str, str]]:
+@lru_cache(maxsize=1)
+def _catalog_validator():
+    try:
+        schema = json.loads(_CATALOG_SCHEMA_PATH.read_text(encoding="utf-8"))
+        validator_class = validator_for(schema)
+        validator_class.check_schema(schema)
+    except (OSError, json.JSONDecodeError, SchemaError) as error:
+        raise EvidenceError("unable to load the closed capability catalog schema") from error
+    return validator_class(schema, format_checker=validator_class.FORMAT_CHECKER)
+
+
+def _catalog_operations(
+    catalog: Mapping[str, Any], expected_inventory_sha256: str
+) -> set[tuple[str, str]]:
     if not isinstance(catalog, Mapping):
         raise EvidenceError("catalog must be a JSON object")
-    if catalog.get("schema_version") != 1:
-        raise EvidenceError("unsupported capability catalog schema version")
+    if not isinstance(expected_inventory_sha256, str) or not _SHA256_PATTERN.fullmatch(
+        expected_inventory_sha256
+    ):
+        raise EvidenceError("expected_inventory_sha256 must be a sha256 digest")
     for key in ("model_catalog_sha256", "inventory_sha256"):
         if not _SHA256_PATTERN.fullmatch(str(catalog.get(key, ""))):
             raise EvidenceError(f"catalog has an invalid {key}")
     inventory_payload = dict(catalog)
     inventory_sha256 = inventory_payload.pop("inventory_sha256")
-    if inventory_sha256 != _sha256(inventory_payload):
+    if inventory_sha256 != expected_inventory_sha256:
+        raise EvidenceError("capability catalog does not match the expected inventory digest")
+    try:
+        actual_inventory_sha256 = _sha256(inventory_payload)
+    except (TypeError, ValueError) as error:
+        raise EvidenceError("capability catalog is not canonical JSON") from error
+    if inventory_sha256 != actual_inventory_sha256:
         raise EvidenceError("capability catalog inventory digest does not match its content")
+    try:
+        _catalog_validator().validate(catalog)
+    except ValidationError as error:
+        raise EvidenceError("capability catalog does not match the closed schema") from error
 
     result: set[tuple[str, str]] = set()
     services = catalog.get("services", {})
@@ -368,6 +398,7 @@ def build_evidence_bundle(
     *,
     observed_at: str,
     source_commit: str,
+    expected_inventory_sha256: str,
     allow_invalid: bool = False,
     limits: EvidenceLimits | None = None,
 ) -> dict[str, Any]:
@@ -377,7 +408,7 @@ def build_evidence_bundle(
     if not _COMMIT_PATTERN.fullmatch(source_commit):
         raise EvidenceError("source_commit must be a full lowercase Git SHA")
     normalized_observed_at = _normalize_observed_at(observed_at)
-    known_operations = _catalog_operations(catalog)
+    known_operations = _catalog_operations(catalog, expected_inventory_sha256)
     paths = _discover_metric_paths(metric_inputs, limits)
     inputs = _input_descriptors(paths)
     descriptor_by_name = {descriptor["name"]: descriptor for descriptor in inputs}
@@ -586,6 +617,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--metrics", required=True, nargs="+", help="metric CSV files/directories")
     parser.add_argument("--observed-at", required=True, help="explicit ISO-8601 observation time")
     parser.add_argument("--source-commit", required=True, help="full Git commit SHA")
+    parser.add_argument(
+        "--expected-inventory-sha256",
+        required=True,
+        help="trusted inventory digest supplied independently from the catalog",
+    )
     parser.add_argument("--output", required=True, help="output evidence JSON")
     parser.add_argument(
         "--allow-invalid",
@@ -605,6 +641,7 @@ def main(argv: list[str] | None = None) -> int:
             args.metrics,
             observed_at=args.observed_at,
             source_commit=args.source_commit,
+            expected_inventory_sha256=args.expected_inventory_sha256,
             allow_invalid=args.allow_invalid,
         )
         output = Path(args.output)

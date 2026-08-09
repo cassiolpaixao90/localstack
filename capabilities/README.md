@@ -42,16 +42,24 @@ PYTHONPATH=localstack-core python -m localstack.capabilities.evidence \
   --metrics target/metric_reports \
   --observed-at 2026-08-08T18:00:00Z \
   --source-commit "$(git rev-parse HEAD)" \
+  --expected-inventory-sha256 "$CAPABILITY_INVENTORY_SHA256" \
   --output target/capability-evidence/evidence.json
 ```
 
-The importer verifies the catalog's schema and inventory digest, streams CSV
-rows, checks each operation against that catalog, and hashes the exact byte
-stream being parsed. File count, input bytes, header, record, field, trace, and
-diagnostic cardinality all have fail-closed ceilings. Output is written
-atomically and conforms to `evidence.schema.json`. Raw metric CSVs can contain
-request details and remain private CI artifacts under `target/`; do not commit
-them.
+The importer validates the catalog against the closed schema, verifies its
+self-digest, and requires an inventory digest supplied independently by a
+trusted CI configuration or attestation. Never derive
+`CAPABILITY_INVENTORY_SHA256` from the catalog in the same untrusted step. It
+then streams CSV rows, checks each operation against that catalog, and hashes
+the exact byte stream being parsed. File count, input bytes, header, record,
+field, trace, and diagnostic cardinality all have fail-closed ceilings. Output
+is written atomically and conforms to `evidence.schema.json`. Raw metric CSVs
+can contain request details and remain private CI artifacts under `target/`;
+do not commit them.
+
+`--source-commit` is a caller-supplied declaration in this informational
+overlay, not an authenticated provenance claim. A promotion workflow must bind
+the commit and expected inventory digest together in a trusted attestation.
 
 This first overlay deliberately has `mode: informational` and marks every
 promotion as ineligible. In the legacy CSV, `aws_validated` means that a test
