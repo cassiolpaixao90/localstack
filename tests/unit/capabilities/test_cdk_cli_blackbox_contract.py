@@ -225,6 +225,9 @@ def test_cdk_python_synth_diagnostic_is_separate_and_closed():
     workflow = _load_bounded_yaml(WORKFLOW_PATH.read_text())
     job = workflow["jobs"]["cdk-cli-blackbox"]
     steps = {step["name"]: step for step in job["steps"]}
+    aggregate_steps = {
+        step["name"]: step for step in workflow["jobs"]["cdk-cli-blackbox-complete"]["steps"]
+    }
     isolated_runner = ISOLATED_RUNNER_PATH.read_text()
 
     assert EXPECTED_TESTS["synth-python-minimal-sqs-v1"] == (
@@ -237,16 +240,44 @@ def test_cdk_python_synth_diagnostic_is_separate_and_closed():
     )
     assert "pytest-junit-cdk-python-synth-$RESULT_ARCH.xml" in isolated_runner
     assert "--scenario synth-python-minimal-sqs-v1" in isolated_runner
+    assert "CDK_PYTHON_SYNTH_OBSERVATION=" in isolated_runner
+    assert "CDK_PYTHON_SYNTH_OUTPUT=" in isolated_runner
 
-    diagnostic = steps["Archive Python synth diagnostic"]
-    assert diagnostic["uses"] == (
-        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    lane = steps["Build Python synth lane receipt"]["run"]
+    assert "python_synth_execution_evidence.py lane" in lane
+    assert "--assembly-output" in lane
+    assert "cdk-python-synth-observation-${{ matrix.arch }}.json" in lane
+    assert "cdk-python-synth-execution-receipt-${{ matrix.arch }}.json" in lane
+
+    artifact = steps["Archive Python synth lane result"]
+    assert artifact["uses"] == ("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a")
+    assert artifact["with"]["name"] == "test-results-cdk-python-synth-${{ matrix.arch }}"
+    assert "test-results-cdk-cli-" not in artifact["with"]["name"]
+    assert "test-results-cdk-bootstrap-upgrade-" not in artifact["with"]["name"]
+    assert artifact["with"]["if-no-files-found"] == "error"
+    assert "pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml" in artifact["with"]["path"]
+    assert "cdk-python-synth-execution-receipt-${{ matrix.arch }}.json" in artifact["with"]["path"]
+
+    download = aggregate_steps["Download Python synth results"]
+    assert download["with"] == {
+        "pattern": "test-results-cdk-python-synth-*",
+        "path": "target/cdk-python-synth-results",
+        "merge-multiple": False,
+    }
+    required = aggregate_steps["Require the passing Python synth matrix"]["run"]
+    assert 'test "${#downloaded[@]}" -eq 4' in required
+    assert "--scenario synth-python-minimal-sqs-v1" in required
+    aggregate = aggregate_steps["Build Python synth candidate evidence"]["run"]
+    assert "python_synth_execution_evidence.py aggregate" in aggregate
+    assert "--receipt-amd64" in aggregate and "--receipt-arm64" in aggregate
+    assert (
+        aggregate_steps["Attest Python synth candidate evidence"]["with"]["subject-path"]
+        == "target/cdk-python-synth-execution-evidence.json"
     )
-    assert diagnostic["with"]["name"] == "diagnostic-cdk-python-synth-${{ matrix.arch }}"
-    assert "test-results-cdk-cli-" not in diagnostic["with"]["name"]
-    assert "test-results-cdk-bootstrap-upgrade-" not in diagnostic["with"]["name"]
-    assert diagnostic["with"]["if-no-files-found"] == "error"
-    assert "pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml" in diagnostic["with"]["path"]
+    assert (
+        aggregate_steps["Archive Python synth candidate evidence"]["with"]["name"]
+        == "cdk-python-synth-execution-evidence"
+    )
 
 
 def test_cdk_python_synth_preserves_the_virtualenv_interpreter_path(tmp_path):

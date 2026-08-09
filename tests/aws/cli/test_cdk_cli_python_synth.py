@@ -1,11 +1,14 @@
 import importlib.metadata
 import json
 import os
+import platform
 import shlex
 import shutil
 import stat
 import sys
 import tarfile
+import time
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 import pytest
@@ -13,7 +16,11 @@ from jsonschema import Draft7Validator
 
 from localstack.cli.cdk import launch_cdk
 from localstack.testing.pytest import markers
-from tests.aws.cli.execution_evidence import read_regular_bounded
+from tests.aws.cli.execution_evidence import read_regular_bounded, write_canonical_json
+from tests.aws.cli.python_synth_execution_evidence import (
+    MAX_OBSERVATION_BYTES,
+    create_observation,
+)
 from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import CdkRuntime
 
 pytest_plugins = ("tests.aws.cli.test_cdk_cli_bootstrap_upgrade",)
@@ -62,6 +69,10 @@ def _reject_duplicate_keys(pairs):
 
 def _load_assembly_json(path: Path, maximum: int = MAX_ASSEMBLY_FILE_BYTES) -> dict:
     payload = read_regular_bounded(path, maximum)
+    return _load_assembly_json_payload(payload)
+
+
+def _load_assembly_json_payload(payload: bytes) -> dict:
     try:
         value = json.loads(payload, object_pairs_hook=_reject_duplicate_keys)
     except (UnicodeDecodeError, ValueError, RecursionError) as error:
@@ -71,7 +82,7 @@ def _load_assembly_json(path: Path, maximum: int = MAX_ASSEMBLY_FILE_BYTES) -> d
     return value
 
 
-def _load_pinned_assembly_schema() -> dict:
+def _load_pinned_assembly_schema() -> tuple[dict, bytes]:
     archive_name = (
         f"cloud-assembly-schema@{PINNED_PYTHON_PACKAGES['aws-cdk-cloud-assembly-schema']}.jsii.tgz"
     )
@@ -97,7 +108,7 @@ def _load_pinned_assembly_schema() -> dict:
         raise ValueError("the pinned Cloud Assembly schema is not bounded valid JSON") from error
     if not isinstance(schema, dict):
         raise ValueError("the pinned Cloud Assembly schema root must be an object")
-    return schema
+    return schema, payload
 
 
 def _assembly_inventory(root: Path) -> dict[str, int]:
@@ -117,6 +128,18 @@ def _assembly_inventory(root: Path) -> dict[str, int]:
     if sum(inventory.values()) > MAX_ASSEMBLY_TOTAL_BYTES:
         raise ValueError("Cloud Assembly total size is outside the accepted bounds")
     return inventory
+
+
+def _assembly_payloads(root: Path, inventory: dict[str, int]) -> dict[str, bytes]:
+    payloads = {
+        name: read_regular_bounded(root / name, MAX_ASSEMBLY_FILE_BYTES)
+        for name in sorted(inventory)
+    }
+    if {name: len(payload) for name, payload in payloads.items()} != dict(
+        sorted(inventory.items())
+    ):
+        raise ValueError("Cloud Assembly changed while it was being inspected")
+    return payloads
 
 
 def _validate_assembly_reference(root: Path, inventory: dict[str, int], reference: str) -> None:
@@ -209,13 +232,21 @@ def _python_interpreter_path(executable: str) -> Path:
 
 @pytest.fixture
 def python_synth_output(tmp_path):
-    output = tmp_path / "assembly"
+    configured = os.environ.get("CDK_PYTHON_SYNTH_OUTPUT")
+    if configured and not _REQUIRED:
+        pytest.fail("Python synth evidence output is restricted to the required CI lane")
+    output = Path(configured) if configured else tmp_path / "assembly"
+    if not output.is_absolute() or os.path.lexists(output):
+        pytest.fail("Python synth output must be a fresh absolute path")
     try:
         yield output
     finally:
-        if output.exists():
-            shutil.rmtree(output, ignore_errors=False)
-        assert not output.exists()
+        if os.path.lexists(output):
+            if output.is_dir() and not output.is_symlink():
+                shutil.rmtree(output, ignore_errors=False)
+            else:
+                output.unlink()
+        assert not os.path.lexists(output)
 
 
 @markers.aws.only_localstack
@@ -223,6 +254,32 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
     pinned_cdk_cli_runtime: CdkRuntime,
     python_synth_output: Path,
 ):
+    observation_path = os.environ.get("CDK_PYTHON_SYNTH_OBSERVATION")
+    if observation_path and not _REQUIRED:
+        pytest.fail("Python synth observations are restricted to the required CI lane")
+    _require(
+        not _REQUIRED or observation_path is not None,
+        "the required Python synth gate needs an observation path",
+    )
+    evidence_environment = {
+        name: os.environ.get(name)
+        for name in (
+            "RESULT_ARCH",
+            "CDK_EXPECTED_MACHINE_ARCH",
+            "CDK_EXPECTED_NODE_ARCH",
+            "CDK_EVIDENCE_REPOSITORY",
+            "CDK_EVIDENCE_COMMIT_SHA",
+            "CDK_EVIDENCE_REF",
+            "CDK_EVIDENCE_EVENT",
+            "CDK_EVIDENCE_WORKFLOW_PATH",
+            "CDK_EVIDENCE_RUN_ID",
+            "CDK_EVIDENCE_RUN_ATTEMPT",
+        )
+    }
+    _require(
+        not _REQUIRED or all(evidence_environment.values()),
+        "the required Python synth gate needs complete evidence metadata",
+    )
     for distribution, expected in PINNED_PYTHON_PACKAGES.items():
         try:
             actual = importlib.metadata.version(distribution)
@@ -258,6 +315,7 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
         "--ci",
         "--quiet",
     ]
+    started = time.monotonic_ns()
     result = launch_cdk(
         argv,
         executable=pinned_cdk_cli_runtime.executable,
@@ -266,6 +324,7 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
         timeout_seconds=60,
         max_output_bytes=256 * 1024,
     )
+    duration_ms = (time.monotonic_ns() - started) // 1_000_000
 
     assert result.returncode == 0, result.stderr.decode(errors="replace")
     assert result.timed_out is False
@@ -273,10 +332,10 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
     assert result.stderr_truncated is False
     inventory = _assembly_inventory(python_synth_output)
     assert set(inventory) == EXPECTED_ASSEMBLY_FILES
+    assembly_files = _assembly_payloads(python_synth_output, inventory)
 
-    manifest_path = python_synth_output / "manifest.json"
-    manifest = _load_assembly_json(manifest_path)
-    assembly_schema = _load_pinned_assembly_schema()
+    manifest = _load_assembly_json_payload(assembly_files["manifest.json"])
+    assembly_schema, schema_payload = _load_pinned_assembly_schema()
     Draft7Validator.check_schema(assembly_schema)
     assembly_validator = Draft7Validator(assembly_schema)
     assembly_validator.validate(manifest)
@@ -368,7 +427,7 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
     ):
         _validate_assembly_reference(python_synth_output, inventory, reference)
 
-    template = _load_assembly_json(python_synth_output / "SynthStack.template.json")
+    template = _load_assembly_json_payload(assembly_files["SynthStack.template.json"])
     assert template == {
         "Parameters": {
             "BootstrapVersion": {
@@ -404,7 +463,7 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
             }
         },
     }
-    asset_manifest = _load_assembly_json(python_synth_output / "SynthStack.assets.json")
+    asset_manifest = _load_assembly_json_payload(assembly_files["SynthStack.assets.json"])
     assert asset_manifest == {
         "version": EMITTED_ASSEMBLY_VERSION,
         "files": {
@@ -434,8 +493,41 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
         inventory,
         asset_manifest["files"][TEMPLATE_ASSET_HASH]["source"]["path"],
     )
-    assert _load_assembly_json(python_synth_output / "cdk.out", 1024) == {
+    assert _load_assembly_json_payload(assembly_files["cdk.out"]) == {
         "version": EMITTED_ASSEMBLY_VERSION
     }
-    tree = _load_assembly_json(python_synth_output / "tree.json")
+    tree = _load_assembly_json_payload(assembly_files["tree.json"])
     assert tree == _expected_tree()
+
+    if observation_path:
+        observation = create_observation(
+            platform_id=f"linux-{evidence_environment['RESULT_ARCH']}",
+            machine_arch=evidence_environment["CDK_EXPECTED_MACHINE_ARCH"],
+            node_arch=evidence_environment["CDK_EXPECTED_NODE_ARCH"],
+            python_version=platform.python_version(),
+            kernel_release=platform.release(),
+            repository=evidence_environment["CDK_EVIDENCE_REPOSITORY"],
+            commit_sha=evidence_environment["CDK_EVIDENCE_COMMIT_SHA"],
+            ref=evidence_environment["CDK_EVIDENCE_REF"],
+            event=evidence_environment["CDK_EVIDENCE_EVENT"],
+            workflow_path=evidence_environment["CDK_EVIDENCE_WORKFLOW_PATH"],
+            run_id=int(evidence_environment["CDK_EVIDENCE_RUN_ID"]),
+            run_attempt=int(evidence_environment["CDK_EVIDENCE_RUN_ATTEMPT"]),
+            python_executable=python,
+            app_path=app,
+            output_path=python_synth_output,
+            argv=argv,
+            assembly_files=assembly_files,
+            schema_payload=schema_payload,
+            returncode=result.returncode,
+            timed_out=result.timed_out,
+            duration_ms=duration_ms,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            stdout_bytes=result.stdout_bytes,
+            stderr_bytes=result.stderr_bytes,
+            stdout_truncated=result.stdout_truncated,
+            stderr_truncated=result.stderr_truncated,
+            observed_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        )
+        write_canonical_json(Path(observation_path), observation, MAX_OBSERVATION_BYTES)

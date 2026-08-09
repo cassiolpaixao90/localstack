@@ -538,7 +538,17 @@ validation. The remaining bootstrap gap is `clean-bootstrap-create-cli-not-run`;
 Cloud Assembly, application deployment, assets, language bindings, and parity
 remain unproven.
 
-The next diagnostic is the first real language-binding boundary. It invokes
+The next diagnostic is the first real language-binding boundary. Run
+`31306819646` for commit
+`954258634f750f3b2dbe1b9f56766af234be00ba` passed this boundary on native
+Linux amd64 and arm64, but produced only JUnit files and is not retrospectively
+promotable evidence. The subsequent workflow contract emits a provisional
+observation after all assembly oracles, creates a receipt only after the exact
+JUnit and teardown prove temporary-output cleanup, and aggregates and attests
+the two native receipts under a Python-synth-specific namespace. That record
+remains a candidate pending separate review.
+
+The gate invokes
 the pinned CLI against a fixed Python app using `aws-cdk-lib` 2.241.0,
 `constructs` 10.5.1, and the default stack synthesizer with one L1
 `AWS::SQS::Queue` and no user-authored file or Docker assets. The gate closes
@@ -546,10 +556,12 @@ the default stack-template asset manifest and requires a bounded,
 regular-file-only Cloud Assembly, validates its emitted schema version, and
 closes the template and construct-tree shape. It runs without lookups,
 user-authored file or Docker assets, CloudFormation resource path metadata,
-external egress, or deployment. Its JUnit is archived separately from both
-retained bootstrap evidence streams. Until a later two-platform receipt, attestation,
-and reviewed promotion exists, this remains diagnostic and does not promote
-Python, `synth`, Cloud Assembly, SQS deployment, or any other language binding.
+external egress, or deployment. Its receipts, aggregate, and attestation remain
+separate from both retained bootstrap evidence streams. Until a first-attempt
+candidate is reviewed and promoted, this does not promote Python, `synth`,
+Cloud Assembly, SQS deployment, or any other language binding. The candidate
+also records that the Python distributions are version-pinned but not yet
+installed from a content-addressed lock.
 
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK

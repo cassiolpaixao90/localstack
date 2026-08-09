@@ -113,6 +113,24 @@ jobs:
           --run-attempt "${{ github.run_attempt }}"
           --output target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-bootstrap-upgrade-execution-receipt-${{ matrix.arch }}.json
 
+      - name: Build Python synth lane receipt
+        run: >-
+          python3 tests/aws/cli/python_synth_execution_evidence.py lane
+          --observation target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-python-synth-observation-${{ matrix.arch }}.json
+          --junit target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml
+          --assembly-output target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-python-synth-assembly-${{ matrix.arch }}
+          --platform-id linux-${{ matrix.arch }}
+          --machine-arch ${{ matrix.machine_arch }}
+          --node-arch ${{ matrix.node_arch }}
+          --repository "${{ github.repository }}"
+          --commit-sha "${{ github.sha }}"
+          --ref "${{ github.ref }}"
+          --event "${{ github.event_name }}"
+          --workflow-path .github/workflows/cdk-cli-blackbox.yml
+          --run-id "${{ github.run_id }}"
+          --run-attempt "${{ github.run_attempt }}"
+          --output target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-python-synth-execution-receipt-${{ matrix.arch }}.json
+
       - name: Archive lane result
         if: success() || failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -135,12 +153,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Archive Python synth diagnostic
+      - name: Archive Python synth lane result
         if: success() || failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: diagnostic-cdk-python-synth-${{ matrix.arch }}
-          path: target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml
+          name: test-results-cdk-python-synth-${{ matrix.arch }}
+          path: |
+            target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml
+            target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-python-synth-execution-receipt-${{ matrix.arch }}.json
           if-no-files-found: error
           retention-days: 30
 
@@ -280,5 +300,66 @@ jobs:
           path: |
             target/cdk-bootstrap-upgrade-execution-evidence.json
             target/cdk-bootstrap-upgrade-execution-evidence.sigstore.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Download Python synth results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: test-results-cdk-python-synth-*
+          path: target/cdk-python-synth-results
+          merge-multiple: false
+
+      - name: Require the passing Python synth matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.cdk-cli-blackbox.result }}" = success
+          test "${{ github.run_attempt }}" = 1
+          mapfile -t downloaded < <(find target/cdk-python-synth-results -type f | LC_ALL=C sort)
+          test "${#downloaded[@]}" -eq 4
+          test "${downloaded[0]}" = target/cdk-python-synth-results/test-results-cdk-python-synth-amd64/cdk-python-synth-execution-receipt-amd64.json
+          test "${downloaded[1]}" = target/cdk-python-synth-results/test-results-cdk-python-synth-amd64/pytest-junit-cdk-python-synth-amd64.xml
+          test "${downloaded[2]}" = target/cdk-python-synth-results/test-results-cdk-python-synth-arm64/cdk-python-synth-execution-receipt-arm64.json
+          test "${downloaded[3]}" = target/cdk-python-synth-results/test-results-cdk-python-synth-arm64/pytest-junit-cdk-python-synth-arm64.xml
+          mapfile -t reports < <(find target/cdk-python-synth-results -type f -name 'pytest-junit-cdk-python-synth-*.xml' | LC_ALL=C sort)
+          test "${#reports[@]}" -eq 2
+          python3 tests/aws/cli/validate_junit.py --scenario synth-python-minimal-sqs-v1 "${reports[@]}"
+
+      - name: Build Python synth candidate evidence
+        run: >-
+          python3 tests/aws/cli/python_synth_execution_evidence.py aggregate
+          --receipt-amd64 target/cdk-python-synth-results/test-results-cdk-python-synth-amd64/cdk-python-synth-execution-receipt-amd64.json
+          --receipt-arm64 target/cdk-python-synth-results/test-results-cdk-python-synth-arm64/cdk-python-synth-execution-receipt-arm64.json
+          --junit-amd64 target/cdk-python-synth-results/test-results-cdk-python-synth-amd64/pytest-junit-cdk-python-synth-amd64.xml
+          --junit-arm64 target/cdk-python-synth-results/test-results-cdk-python-synth-arm64/pytest-junit-cdk-python-synth-arm64.xml
+          --project-root "$PWD"
+          --repository "${{ github.repository }}"
+          --commit-sha "${{ github.sha }}"
+          --ref "${{ github.ref }}"
+          --event "${{ github.event_name }}"
+          --workflow-path .github/workflows/cdk-cli-blackbox.yml
+          --run-id "${{ github.run_id }}"
+          --run-attempt "${{ github.run_attempt }}"
+          --output target/cdk-python-synth-execution-evidence.json
+
+      - name: Attest Python synth candidate evidence
+        id: attest_python_synth
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          subject-path: target/cdk-python-synth-execution-evidence.json
+
+      - name: Preserve Python synth attestation bundle
+        run: >-
+          cp "${{ steps.attest_python_synth.outputs.bundle-path }}"
+          target/cdk-python-synth-execution-evidence.sigstore.json
+
+      - name: Archive Python synth candidate evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: cdk-python-synth-execution-evidence
+          path: |
+            target/cdk-python-synth-execution-evidence.json
+            target/cdk-python-synth-execution-evidence.sigstore.json
           if-no-files-found: error
           retention-days: 90

@@ -63,6 +63,8 @@ case "$mode" in
         RESULT_ARCH="$result_arch" \
         CDK_EXECUTION_RECEIPT="$sandbox_gate_root/cdk-execution-receipt-$result_arch.json" \
         CDK_BOOTSTRAP_UPGRADE_OBSERVATION="$sandbox_gate_root/cdk-bootstrap-upgrade-observation-$result_arch.json" \
+        CDK_PYTHON_SYNTH_OBSERVATION="$sandbox_gate_root/cdk-python-synth-observation-$result_arch.json" \
+        CDK_PYTHON_SYNTH_OUTPUT="$sandbox_gate_root/cdk-python-synth-assembly-$result_arch" \
         CDK_EXPECTED_MACHINE_ARCH="$machine_arch" \
         CDK_EXPECTED_NODE_ARCH="$node_arch" \
         CDK_EVIDENCE_REPOSITORY="$repository" \

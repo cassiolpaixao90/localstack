@@ -163,15 +163,25 @@ Promotion must pass both the closed JSON Schema and the scenario runtime
 validator, which enforces cross-field run, platform, and command relationships
 that JSON Schema cannot express by itself.
 
-The Python `synth-python-minimal-sqs-v1` follow-up is deliberately diagnostic.
-It uses the already pinned Python CDK packages and default stack synthesizer to
+The Python `synth-python-minimal-sqs-v1` follow-up remains isolated from the
+promoted compatibility manifest. Run `31306819646` for commit
+`954258634f750f3b2dbe1b9f56766af234be00ba` passed its exact JUnit on native
+Linux amd64 and arm64, but retained no observation, receipt, aggregate, or
+attestation and is therefore diagnostic only. The workflow now defines a
+separate first-attempt candidate chain whose observation is emitted only after
+the assembly oracles pass and whose receipt is created only after pytest and
+temporary-output cleanup complete successfully.
+
+The gate uses the already pinned Python CDK packages and default stack synthesizer to
 synthesize one L1 SQS resource through the real CLI, with no user-authored file
 or Docker assets, lookups, deployment, or external egress. The default
 synthesizer's stack-template asset manifest is closed explicitly. The emitted
-assembly is bounded and structurally validated, but its standalone JUnit is
-not compatibility evidence. A separate native
-amd64/arm64 receipt, aggregate, attestation, and review are required before the
-manifest can record Python or Cloud Assembly support.
+assembly is bounded and structurally validated. A future first-attempt candidate
+must contain matching native amd64/arm64 receipts, a content-addressed aggregate,
+and a separate Sigstore attestation. It remains ineligible for promotion until
+those bytes are reviewed; the Python distributions are not yet installed from
+a content-addressed lock. The manifest cannot record Python or Cloud Assembly
+support from the diagnostic run or merely from the existence of this workflow.
 
 Ingestion is allowed only after offline bundle verification pins every signer
 boundary used by this record:
