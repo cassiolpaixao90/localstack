@@ -1,0 +1,127 @@
+name: CDK CLI Black-box
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  cdk-cli-blackbox:
+    name: CDK CLI Black-box (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+            machine_arch: x86_64
+            node_arch: x64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+            machine_arch: aarch64
+            node_arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Set up pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.2
+          package-manager-cache: 'false'
+
+      - name: Install Python test dependencies
+        run: make install-test
+
+      - name: Install pinned CDK CLI
+        run: >-
+          npm ci --prefix tests/aws/cli --ignore-scripts --no-audit --no-fund
+          --engine-strict
+
+      - name: Run CDK gate without external egress
+        shell: bash
+        run: |
+          set -euo pipefail
+          host_uid="$(id -u)"
+          host_gid="$(id -g)"
+          sandbox_uid="$(id -u nobody)"
+          sandbox_gid="$(id -g nobody)"
+          node_dir="$(dirname "$(command -v node)")"
+          gate_root="$PWD/target/cdk-cli-blackbox-${{ matrix.arch }}"
+          mkdir -p "$gate_root/home" "$gate_root/tmp"
+
+          set +e
+          sudo timeout --signal=TERM --kill-after=10s 240s \
+            unshare --net --pid --fork --kill-child=KILL --mount-proc -- \
+              "$PWD/scripts/run_cdk_cli_blackbox_isolated.sh" enter \
+              "$sandbox_uid" \
+              "$sandbox_gid" \
+              "$gate_root" \
+              "$node_dir" \
+              "$PWD" \
+              "${{ matrix.arch }}" \
+              "${{ matrix.machine_arch }}" \
+              "${{ matrix.node_arch }}"
+          gate_status="$?"
+          set -e
+          sudo chown -R "$host_uid:$host_gid" "$gate_root"
+          exit "$gate_status"
+
+      - name: Verify exact JUnit result
+        run: >-
+          python3 tests/aws/cli/validate_junit.py
+          "target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-cli-${{ matrix.arch }}.xml"
+
+      - name: Archive JUnit result
+        if: success() || failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: test-results-cdk-cli-${{ matrix.arch }}
+          path: target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-cli-${{ matrix.arch }}.xml
+          if-no-files-found: warn
+          retention-days: 30
+
+  cdk-cli-blackbox-complete:
+    name: CDK CLI Black-box (matrix complete)
+    if: always()
+    needs: cdk-cli-blackbox
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Download architecture results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: test-results-cdk-cli-*
+          path: target/cdk-cli-results
+          merge-multiple: true
+
+      - name: Require the complete passing matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.cdk-cli-blackbox.result }}" = success
+          mapfile -t reports < <(find target/cdk-cli-results -type f -name 'pytest-junit-cdk-cli-*.xml' | LC_ALL=C sort)
+          test "${#reports[@]}" -eq 2
+          test "${reports[0]}" = target/cdk-cli-results/pytest-junit-cdk-cli-amd64.xml
+          test "${reports[1]}" = target/cdk-cli-results/pytest-junit-cdk-cli-arm64.xml
+          python3 tests/aws/cli/validate_junit.py "${reports[@]}"

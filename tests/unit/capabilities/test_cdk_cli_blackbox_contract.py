@@ -7,11 +7,15 @@ from tests.aws.cli.test_cdk_cli_blackbox import (
     MAX_YAML_DEPTH,
     MAX_YAML_NODES,
     _load_bounded_yaml,
+    _validate_required_network_isolation,
     _validate_required_target,
 )
+from tests.aws.cli.validate_junit import validate_junit
 
 PROJECT_ROOT = Path(__file__).parents[3]
 TOOLCHAIN_ROOT = PROJECT_ROOT / "tests/aws/cli"
+WORKFLOW_PATH = PROJECT_ROOT / ".github/workflows/cdk-cli-blackbox.yml"
+ISOLATED_RUNNER_PATH = PROJECT_ROOT / "scripts/run_cdk_cli_blackbox_isolated.sh"
 
 
 def test_cdk_cli_blackbox_toolchain_is_exactly_pinned():
@@ -36,6 +40,89 @@ def test_cdk_cli_blackbox_toolchain_is_exactly_pinned():
         "sha512-g1jcMfWlyYtGamFJ/kPBOCuchl3NfwTF2UwOLTIDN0nJbGm84EAO+c8DlYnaemM8"
         "UmKFkdoq4BGdmiNL5nHWwA=="
     )
+
+
+def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
+    workflow = _load_bounded_yaml(WORKFLOW_PATH.read_text())
+    job = workflow["jobs"]["cdk-cli-blackbox"]
+
+    assert workflow[True] == {"push": {"branches": ["main"]}}
+    assert workflow["permissions"] == {"contents": "read"}
+    assert job["strategy"]["fail-fast"] is False
+    assert job["strategy"]["matrix"]["include"] == [
+        {
+            "runner": "ubuntu-24.04",
+            "arch": "amd64",
+            "machine_arch": "x86_64",
+            "node_arch": "x64",
+        },
+        {
+            "runner": "ubuntu-24.04-arm",
+            "arch": "arm64",
+            "machine_arch": "aarch64",
+            "node_arch": "arm64",
+        },
+    ]
+    assert job["runs-on"] == "${{ matrix.runner }}"
+
+    steps = {step["name"]: step for step in job["steps"]}
+    checkout = steps["Checkout"]
+    assert checkout["uses"] == "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803"
+    assert checkout["with"]["persist-credentials"] is False
+    node_setup = steps["Set up pinned Node"]
+    assert node_setup["uses"] == "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38"
+    assert node_setup["with"] == {
+        "node-version": "22.23.2",
+        "package-manager-cache": "false",
+    }
+    isolated_run = steps["Run CDK gate without external egress"]["run"]
+    assert "sudo timeout" in isolated_run
+    assert "unshare --net --pid --fork --kill-child=KILL --mount-proc" in isolated_run
+    assert "scripts/run_cdk_cli_blackbox_isolated.sh" in isolated_run
+    assert 'sudo chown -R "$host_uid:$host_gid" "$gate_root"' in isolated_run
+
+    isolated_runner = ISOLATED_RUNNER_PATH.read_text()
+    assert "ip link set lo up" in isolated_runner
+    assert "mount --make-rprivate /" in isolated_runner
+    assert "mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run" in isolated_runner
+    assert "mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp" in isolated_runner
+    assert "setpriv" in isolated_runner
+    assert "--clear-groups" in isolated_runner
+    assert "--no-new-privs" in isolated_runner
+    assert "--inh-caps=-all" in isolated_runner
+    assert "--ambient-caps=-all" in isolated_runner
+    assert "--bounding-set=-all" in isolated_runner
+    assert "env -i" in isolated_runner
+    assert 'PATH="$node_dir:/usr/sbin:/usr/bin:/sbin:/bin"' in isolated_runner
+    assert "TEST_TARGET=LOCALSTACK" in isolated_runner
+    assert "CDK_REAL_CLI_REQUIRED=1" in isolated_runner
+    assert 'if [[ -w "$WORKSPACE" ]]' in isolated_runner
+    assert "/home/runner/work/_temp/_runner_file_commands" in isolated_runner
+    assert "find /run /tmp -type s" in isolated_runner
+    assert steps["Archive JUnit result"]["uses"] == (
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    )
+
+    aggregator = workflow["jobs"]["cdk-cli-blackbox-complete"]
+    assert aggregator["needs"] == "cdk-cli-blackbox"
+    aggregate_steps = {step["name"]: step for step in aggregator["steps"]}
+    assert aggregate_steps["Download architecture results"]["uses"] == (
+        "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
+    )
+    aggregate_run = aggregate_steps["Require the complete passing matrix"]["run"]
+    assert 'test "${#reports[@]}" -eq 2' in aggregate_run
+    assert "pytest-junit-cdk-cli-amd64.xml" in aggregate_run
+    assert "pytest-junit-cdk-cli-arm64.xml" in aggregate_run
+
+
+def test_required_cdk_cli_gate_rejects_external_network_interfaces():
+    _validate_required_network_isolation(False, "darwin", {"lo0", "en0"})
+    _validate_required_network_isolation(True, "linux", {"lo"})
+
+    with pytest.raises(pytest.UsageError, match="only the loopback interface"):
+        _validate_required_network_isolation(True, "linux", {"eth0", "lo"})
+    with pytest.raises(pytest.UsageError, match="only the loopback interface"):
+        _validate_required_network_isolation(True, "darwin", {"lo0"})
 
 
 @pytest.mark.parametrize("test_target", [None, "AWS_CLOUD"])
@@ -68,3 +155,34 @@ def test_cdk_cli_yaml_loader_rejects_excessive_nodes():
 
     with pytest.raises(ValueError, match="node limit"):
         _load_bounded_yaml(f"value: [{wide_sequence}]\n")
+
+
+def test_cdk_cli_junit_validator_accepts_exact_pass(tmp_path):
+    report = tmp_path / "report.xml"
+    report.write_text(
+        '<testsuites tests="1" failures="0" errors="0" skipped="0">'
+        '<testsuite name="cdk-cli" tests="1" failures="0" errors="0" skipped="0">'
+        '<testcase classname="tests.aws.cli.test_cdk_cli_blackbox" '
+        'name="test_cdk_cli_bootstrap_show_template_matches_pinned_v32" />'
+        "</testsuite></testsuites>"
+    )
+
+    validate_junit(report)
+
+
+@pytest.mark.parametrize(
+    "testcase",
+    [
+        '<testcase classname="tests.aws.cli.test_cdk_cli_blackbox" '
+        'name="test_cdk_cli_bootstrap_show_template_matches_pinned_v32"><skipped /></testcase>',
+        '<testcase classname="tests.aws.cli.test_cdk_cli_blackbox" '
+        'name="test_cdk_cli_bootstrap_show_template_matches_pinned_v32"><failure /></testcase>',
+        '<testcase classname="tests.aws.cli.test_cdk_cli_blackbox" name="unexpected" />',
+    ],
+)
+def test_cdk_cli_junit_validator_rejects_non_promotable_results(tmp_path, testcase):
+    report = tmp_path / "report.xml"
+    report.write_text(f"<testsuites><testsuite>{testcase}</testsuite></testsuites>")
+
+    with pytest.raises(ValueError):
+        validate_junit(report)

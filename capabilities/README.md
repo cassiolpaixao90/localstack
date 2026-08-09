@@ -97,24 +97,25 @@ settings, Python import paths, or a persistent multiprocessing tracker.
 
 The first real-CLI black-box gate is intentionally language-neutral and does
 not create cloud resources. Its toolchain is locked under `tests/aws/cli/` to
-Node 22.23.2 and `aws-cdk` 2.1135.1. The required CI lane must install it from
-the committed lock before denying external egress, set
-`CDK_REAL_CLI_REQUIRED=1`, and run:
+Node 22.23.2 and `aws-cdk` 2.1135.1. The dedicated CI workflow runs natively on
+Linux amd64 and arm64, installs from the committed lock, then executes pytest
+inside a network namespace containing only loopback. A local diagnostic run
+can install and invoke the same test with:
 
 ```bash
 npm ci --prefix tests/aws/cli --ignore-scripts --no-audit --no-fund --engine-strict
-TEST_TARGET=LOCALSTACK CDK_REAL_CLI_REQUIRED=1 \
-  pytest tests/aws/cli/test_cdk_cli_blackbox.py
+TEST_TARGET=LOCALSTACK pytest tests/aws/cli/test_cdk_cli_blackbox.py
 ```
 
 The test uses the safe adapter primitives with bounded output and runtime,
-requires the exact CLI version, and compares `bootstrap --show-template`
-semantically with the pinned official v32 template. A local run with a
-different Node version may set `CDK_EXPECTED_NODE_VERSION` for diagnostics,
-but that execution is not promotion evidence. This gate alone does not prove
-bootstrap deployment, Cloud Assembly generation, a language binding, or AWS
-parity, so the aggregate manifest remains unchanged until the required
-platform matrix produces attestable evidence.
+requires the exact native architecture and CLI version, and compares
+`bootstrap --show-template` semantically with the pinned official v32
+template. A local run with a different Node version may set
+`CDK_EXPECTED_NODE_VERSION` for diagnostics, but that execution is not
+promotion evidence. This gate alone does not prove bootstrap deployment,
+Cloud Assembly generation, a language binding, or AWS parity, so the
+aggregate manifest remains unchanged until both post-merge platform runs
+produce attestable evidence.
 
 The static provider inventory covers the providers declared by this checkout.
 Static classifications use the provider registered as `default`; the JSON also

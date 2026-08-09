@@ -1,7 +1,10 @@
 import hashlib
 import json
 import os
+import platform
 import shutil
+import socket
+import sys
 from pathlib import Path
 
 import pytest
@@ -35,6 +38,17 @@ def _validate_required_target(required: bool, test_target: str | None) -> None:
     if required and test_target != "LOCALSTACK":
         raise pytest.UsageError(
             "CDK_REAL_CLI_REQUIRED requires TEST_TARGET=LOCALSTACK; skips cannot promote"
+        )
+
+
+def _validate_required_network_isolation(
+    required: bool, system: str, interface_names: set[str]
+) -> None:
+    if not required:
+        return
+    if system != "linux" or interface_names != {"lo"}:
+        raise pytest.UsageError(
+            "the required CDK gate must run on Linux with only the loopback interface"
         )
 
 
@@ -102,6 +116,26 @@ def test_cdk_cli_bootstrap_show_template_matches_pinned_v32(
     region_name,
 ):
     _require(os.name == "posix", "the safe CDK supervisor requires POSIX")
+    _validate_required_network_isolation(
+        _REQUIRED,
+        sys.platform,
+        {name for _, name in socket.if_nameindex()},
+    )
+    expected_machine_arch = os.environ.get("CDK_EXPECTED_MACHINE_ARCH")
+    expected_node_arch = os.environ.get("CDK_EXPECTED_NODE_ARCH")
+    _require(
+        not _REQUIRED or expected_machine_arch is not None,
+        "the required CDK gate needs an expected machine architecture",
+    )
+    _require(
+        not _REQUIRED or expected_node_arch is not None,
+        "the required CDK gate needs an expected Node architecture",
+    )
+    if expected_machine_arch:
+        _require(
+            platform.machine() == expected_machine_arch,
+            f"native machine architecture {expected_machine_arch} is required",
+        )
     node = shutil.which("node")
     _require(node is not None, "the pinned Node executable is not installed")
     node = str(Path(node).resolve())
@@ -123,6 +157,21 @@ def test_cdk_cli_bootstrap_show_template_matches_pinned_v32(
         node_result.stdout.decode().strip() == f"v{expected_node_version}",
         f"Node {expected_node_version} is required",
     )
+    node_arch_result = launch_cdk(
+        ["--print", "process.arch"],
+        executable=node,
+        environment={"PATH": str(Path(node).parent)},
+        timeout_seconds=5,
+        max_output_bytes=4096,
+    )
+    _require(node_arch_result.returncode == 0, "the Node architecture probe failed")
+    _require(not node_arch_result.stdout_truncated, "the Node architecture output was truncated")
+    _require(not node_arch_result.stderr_truncated, "the Node architecture error was truncated")
+    if expected_node_arch:
+        _require(
+            node_arch_result.stdout.decode().strip() == expected_node_arch,
+            f"native Node architecture {expected_node_arch} is required",
+        )
 
     cdk_executable = (TOOLCHAIN_ROOT / "node_modules/aws-cdk/bin/cdk").resolve()
     _require(cdk_executable.is_file(), "run npm ci in tests/aws/cli before this gate")
