@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -60,6 +60,22 @@ def _sha256(value: Any) -> str:
     return f"sha256:{hashlib.sha256(_canonical_json(value).encode()).hexdigest()}"
 
 
+def _evict_botocore_service_cache(loader: Any, service_name: str, raw_model: Any) -> None:
+    cache = getattr(loader, "_cache", None)
+    if not isinstance(cache, dict):
+        raise RuntimeError("Botocore loader cache contract changed")
+    for key in tuple(cache):
+        if not isinstance(key, tuple):
+            continue
+        if any(
+            isinstance(part, str) and (part == service_name or part.startswith(f"{service_name}/"))
+            for part in key[1:]
+        ):
+            cache.pop(key)
+    if any(value is raw_model for value in cache.values()):
+        raise RuntimeError(f"Botocore loader retained the {service_name} service model")
+
+
 def load_botocore_models() -> tuple[str, dict[str, ServiceModelRecord]]:
     """Load the pinned Botocore catalog without importing LocalStack providers."""
 
@@ -81,6 +97,8 @@ def load_botocore_models() -> tuple[str, dict[str, ServiceModelRecord]]:
             model_sha256=_sha256(raw_model),
             operations=operations,
         )
+        _evict_botocore_service_cache(loader, service_name, raw_model)
+        del raw_model, metadata
 
     return botocore.__version__, result
 
@@ -203,6 +221,7 @@ def _scan_provider_handlers(
     module: str | None,
     class_name: str | None,
     generated_api: GeneratedApiRecord | None,
+    parse_source: Callable[[Path], ast.Module],
 ) -> dict[str, HandlerRecord]:
     if not module or not class_name:
         return {}
@@ -228,7 +247,7 @@ def _scan_provider_handlers(
         source_path = _module_source_path(project_root, current_module)
         if not source_path.exists():
             return False
-        tree = ast.parse(source_path.read_text(), filename=str(source_path))
+        tree = parse_source(source_path)
         class_node = next(
             (
                 node
@@ -259,7 +278,7 @@ def _scan_provider_handlers(
         source_path = _module_source_path(project_root, current_module)
         if not source_path.exists():
             return {}
-        tree = ast.parse(source_path.read_text(), filename=str(source_path))
+        tree = parse_source(source_path)
         provider_class = next(
             (
                 node
@@ -314,7 +333,16 @@ def scan_providers(
     project_root: Path, generated_apis: Mapping[str, GeneratedApiRecord]
 ) -> dict[str, tuple[ProviderRecord, ...]]:
     registry_path = project_root / "localstack-core" / "localstack" / "services" / "providers.py"
-    tree = ast.parse(registry_path.read_text(), filename=str(registry_path))
+    parsed_sources: dict[Path, ast.Module] = {}
+
+    def parse_source(source_path: Path) -> ast.Module:
+        if source_path not in parsed_sources:
+            parsed_sources[source_path] = ast.parse(
+                source_path.read_text(), filename=str(source_path)
+            )
+        return parsed_sources[source_path]
+
+    tree = parse_source(registry_path)
     providers: dict[str, list[ProviderRecord]] = {}
 
     for function in (node for node in tree.body if isinstance(node, ast.FunctionDef)):
@@ -353,7 +381,11 @@ def scan_providers(
             fallback = None
 
         handlers = _scan_provider_handlers(
-            project_root, module, class_name, generated_apis.get(service)
+            project_root,
+            module,
+            class_name,
+            generated_apis.get(service),
+            parse_source,
         )
         providers.setdefault(service, []).append(
             ProviderRecord(

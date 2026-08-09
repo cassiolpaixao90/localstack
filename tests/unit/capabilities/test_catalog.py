@@ -12,6 +12,7 @@ from localstack.capabilities.catalog import (
     _sha256,
     build_catalog,
     generate_artifacts,
+    load_botocore_models,
     render_json,
     scan_generated_apis,
     scan_providers,
@@ -266,7 +267,19 @@ def sample():
     assert not handler.unconditional_notimplemented
 
 
-def test_scans_handlers_inherited_from_imported_provider(tmp_path: Path):
+def test_scans_handlers_inherited_from_imported_provider(tmp_path: Path, monkeypatch):
+    from localstack.capabilities import catalog as catalog_module
+
+    original_parse = ast.parse
+    parse_counts = {}
+
+    def counted_parse(source, *args, **kwargs):
+        filename = kwargs.get("filename", args[0] if args else "<unknown>")
+        if str(filename).startswith(str(tmp_path)):
+            parse_counts[filename] = parse_counts.get(filename, 0) + 1
+        return original_parse(source, *args, **kwargs)
+
+    monkeypatch.setattr(catalog_module.ast, "parse", counted_parse)
     api_path = tmp_path / "localstack-core/localstack/aws/api/sample/__init__.py"
     base_path = tmp_path / "localstack-core/localstack/services/sample/base.py"
     provider_path = tmp_path / "localstack-core/localstack/services/sample/provider.py"
@@ -329,6 +342,100 @@ def sample():
     handlers = providers["sample"][0].handlers
     assert handlers["InheritedThing"].class_name == "BaseProvider"
     assert handlers["OverriddenThing"].class_name == "DerivedProvider"
+    assert parse_counts == {
+        str(api_path): 1,
+        str(base_path): 1,
+        str(provider_path): 1,
+        str(registry_path): 1,
+    }
+
+
+def test_provider_ast_cache_is_scoped_to_one_scan(tmp_path: Path):
+    api_path = tmp_path / "localstack-core/localstack/aws/api/sample/__init__.py"
+    provider_path = tmp_path / "localstack-core/localstack/services/sample/provider.py"
+    registry_path = tmp_path / "localstack-core/localstack/services/providers.py"
+    api_path.parent.mkdir(parents=True)
+    provider_path.parent.mkdir(parents=True)
+    api_path.write_text(
+        'class SampleApi:\n    service: str = "sample"\n    version: str = "1"\n'
+        '    @handler("DoThing")\n    def do_thing(self):\n        raise NotImplementedError\n'
+    )
+    registry_path.write_text(
+        "@aws_provider()\ndef sample():\n"
+        "    from localstack.services.sample.provider import SampleProvider\n"
+        "    provider = SampleProvider()\n    return Service.for_provider(provider)\n"
+    )
+
+    provider_path.write_text(
+        "from localstack.aws.api.sample import SampleApi\n"
+        "class SampleProvider(SampleApi):\n"
+        "    def do_thing(self):\n        return {'version': 1}\n"
+    )
+    generated = scan_generated_apis(tmp_path)
+    first = scan_providers(tmp_path, generated)
+
+    provider_path.write_text(
+        "from localstack.aws.api.sample import SampleApi\n"
+        "class SampleProvider(SampleApi):\n"
+        "    def do_thing(self):\n        raise NotImplementedError\n"
+    )
+    second = scan_providers(tmp_path, generated)
+
+    assert not first["sample"][0].handlers["DoThing"].unconditional_notimplemented
+    assert second["sample"][0].handlers["DoThing"].unconditional_notimplemented
+
+
+def test_botocore_models_release_each_service_from_loader_cache(monkeypatch):
+    import botocore
+    import botocore.session
+
+    class FakeLoader:
+        def __init__(self):
+            self._cache = {
+                ("list_available_services", "service-2"): ["s3control", "s3"],
+                ("load_data_with_path", "s3control/1/service-2"): object(),
+            }
+            self.loaded = []
+
+        def load_service_model(self, service_name, model_type):
+            if self.loaded:
+                previous = self.loaded[-1]
+                assert not any(
+                    previous == part or str(part).startswith(f"{previous}/")
+                    for key in self._cache
+                    for part in key[1:]
+                )
+            self.loaded.append(service_name)
+            raw_model = {
+                "metadata": {"apiVersion": "1", "protocol": "json"},
+                "operations": {"Zed": {}, "Alpha": {}},
+            }
+            self._cache[("load_service_model", service_name, model_type)] = raw_model
+            self._cache[("load_data_with_path", f"{service_name}/1/{model_type}")] = raw_model
+            self._cache[("load_data_with_path", f"{service_name}/1/{model_type}.sdk-extras")] = (
+                raw_model
+            )
+            return raw_model
+
+    loader = FakeLoader()
+
+    class FakeSession:
+        def get_component(self, name):
+            assert name == "data_loader"
+            return loader
+
+        def get_available_services(self):
+            return ["s3control", "s3"]
+
+    monkeypatch.setattr(botocore, "__version__", "test")
+    monkeypatch.setattr(botocore.session, "Session", FakeSession)
+
+    version, models = load_botocore_models()
+
+    assert version == "test"
+    assert list(models) == ["s3", "s3control"]
+    assert models["s3"].operations == ("Alpha", "Zed")
+    assert set(loader._cache) == {("list_available_services", "service-2")}
 
 
 def test_ignores_undecorated_methods_without_generated_api_base(tmp_path: Path):
