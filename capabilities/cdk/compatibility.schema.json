@@ -214,7 +214,7 @@
         "limitations"
       ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "id": {"enum": ["bootstrap-show-template-v32", "bootstrap-upgrade-v28-v32"]},
         "status": {"const": "cli-pass"},
         "construct_language": {"type": "null"},
         "platforms": {
@@ -229,14 +229,14 @@
         "run_attempt": {"const": 1},
         "artifact_path": {
           "type": "string",
-          "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-cli-execution-evidence\\.json$"
+          "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/(?:cdk-cli|cdk-bootstrap-upgrade)-execution-evidence\\.json$"
         },
         "artifact_sha256": {"$ref": "#/$defs/hash"},
         "evidence_id": {"$ref": "#/$defs/hash"},
         "claim_id": {"$ref": "#/$defs/hash"},
         "attestation_path": {
           "type": "string",
-          "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-cli-execution-evidence\\.sigstore\\.json$"
+          "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/(?:cdk-cli|cdk-bootstrap-upgrade)-execution-evidence\\.sigstore\\.json$"
         },
         "attestation_sha256": {"$ref": "#/$defs/hash"},
         "toolchain": {
@@ -246,11 +246,75 @@
           "properties": {
             "node": {"type": "string", "minLength": 1},
             "cdk_cli": {"type": "string", "minLength": 1},
+            "source_bootstrap": {"type": "integer", "minimum": 1},
             "bootstrap": {"type": "integer", "minimum": 1}
           }
         },
         "limitations": {"$ref": "#/$defs/stringArray"}
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"id": {"const": "bootstrap-show-template-v32"}}, "required": ["id"]},
+          "then": {
+            "properties": {
+              "artifact_path": {
+                "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-cli-execution-evidence\\.json$"
+              },
+              "attestation_path": {
+                "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-cli-execution-evidence\\.sigstore\\.json$"
+              },
+              "toolchain": {
+                "not": {"required": ["source_bootstrap"]},
+                "properties": {"bootstrap": {"const": 32}}
+              },
+              "limitations": {
+                "type": "array",
+                "prefixItems": [
+                  {"const": "no-bootstrap-deploy"},
+                  {"const": "no-cloud-assembly"},
+                  {"const": "no-language-binding"},
+                  {"const": "no-aws-differential"}
+                ],
+                "items": false,
+                "minItems": 4,
+                "maxItems": 4
+              }
+            }
+          }
+        },
+        {
+          "if": {"properties": {"id": {"const": "bootstrap-upgrade-v28-v32"}}, "required": ["id"]},
+          "then": {
+            "properties": {
+              "artifact_path": {
+                "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-bootstrap-upgrade-execution-evidence\\.json$"
+              },
+              "attestation_path": {
+                "pattern": "^capabilities/cdk/evidence/runs/[1-9][0-9]*/cdk-bootstrap-upgrade-execution-evidence\\.sigstore\\.json$"
+              },
+              "toolchain": {
+                "required": ["source_bootstrap"],
+                "properties": {
+                  "source_bootstrap": {"const": 28},
+                  "bootstrap": {"const": 32}
+                }
+              },
+              "limitations": {
+                "type": "array",
+                "prefixItems": [
+                  {"const": "no-clean-bootstrap-create"},
+                  {"const": "no-cloud-assembly"},
+                  {"const": "no-language-binding"},
+                  {"const": "no-aws-differential"}
+                ],
+                "items": false,
+                "minItems": 4,
+                "maxItems": 4
+              }
+            }
+          }
+        }
+      ]
     },
     "capability": {
       "type": "object",

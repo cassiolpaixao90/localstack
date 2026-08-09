@@ -699,7 +699,7 @@ def validate_aggregate_evidence(value: object) -> dict:
     _validate_run(expected_run)
     harness = _expect_keys(evidence["harness"], {"input_sha256"}, "bootstrap upgrade harness")
     digests = harness["input_sha256"]
-    if not isinstance(digests, dict) or tuple(digests) != PINNED_INPUTS:
+    if not isinstance(digests, dict) or set(digests) != set(PINNED_INPUTS):
         raise ValueError("bootstrap upgrade harness input set is not exact")
     for path, digest in digests.items():
         if Path(path).is_absolute() or ".." in Path(path).parts:

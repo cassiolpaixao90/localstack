@@ -152,9 +152,13 @@ values in the record. The two
 native receipts are aggregated under
 `cdk/bootstrap-upgrade-execution-evidence.schema.json` and attested as a subject
 separate from the retained `bootstrap-show-template-v32` evidence. Candidate
-records remain ineligible for promotion until a later review preserves and
-verifies the exact first-attempt post-merge run. This transition does not prove
-a clean bootstrap create, Cloud Assembly, any language binding, or AWS parity.
+run `31305122966` for commit
+`c4a933343b6be315208edd68bb4827650275fcc6` passed both native platforms; its
+content-addressed aggregate and Sigstore bundle are retained under
+`cdk/evidence/runs/31305122966/`. This promotes only the language-neutral
+`bootstrap-upgrade-v28-v32` scenario to `cli-pass`. The broad bootstrap
+capability remains `api-simulated`; this transition does not prove a clean
+bootstrap create, Cloud Assembly, any language binding, or AWS parity.
 Promotion must pass both the closed JSON Schema and the scenario runtime
 validator, which enforces cross-field run, platform, and command relationships
 that JSON Schema cannot express by itself.
@@ -170,10 +174,18 @@ gh attestation verify capabilities/cdk/evidence/runs/31288954038/cdk-cli-executi
   --source-digest 1a23acd9b65fef0ef5a944bd4b412f9af9348665 \
   --source-ref refs/heads/main \
   --deny-self-hosted-runners
+
+gh attestation verify capabilities/cdk/evidence/runs/31305122966/cdk-bootstrap-upgrade-execution-evidence.json \
+  --bundle capabilities/cdk/evidence/runs/31305122966/cdk-bootstrap-upgrade-execution-evidence.sigstore.json \
+  --repo cassiolpaixao90/localstack \
+  --signer-workflow cassiolpaixao90/localstack/.github/workflows/cdk-cli-blackbox.yml \
+  --source-digest c4a933343b6be315208edd68bb4827650275fcc6 \
+  --source-ref refs/heads/main \
+  --deny-self-hosted-runners
 ```
 
 The unit gate checks the retained bytes, DSSE subject and provenance fields;
-the command above is the cryptographic signature and certificate-chain gate.
+the commands above are the cryptographic signature and certificate-chain gates.
 
 The static provider inventory covers the providers declared by this checkout.
 Static classifications use the provider registered as `default`; the JSON also

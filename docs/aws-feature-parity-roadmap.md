@@ -509,8 +509,8 @@ externally attached policy, checks the v32 trust/inline/managed-policy deltas,
 and requires strict stack, bucket, role, and SSM cleanup. This runs as a second
 JUnit result in the isolated amd64/arm64 matrix without changing the retained
 `bootstrap-show-template-v32` receipt or attestation. Until the deployment
-scenario has its own content-addressed two-platform evidence and reviewed
-promotion commit, `bootstrap-deployment-cli-not-run` remains an active gap.
+transition had its own content-addressed two-platform evidence and reviewed
+promotion commit, `bootstrap-deployment-cli-not-run` remained an active gap.
 
 Run `31290258541` for commit
 `ccaa955d086e56dc04caa521bf1ffe047292a1c0` passed that diagnostic in native
@@ -519,12 +519,24 @@ promotable evidence run. The follow-up contract keeps the original
 show-template aggregate unchanged and gives the upgrade its own bounded
 observation, post-cleanup lane receipt, two-platform aggregate, schema,
 attestation subject, and artifact namespace. The first subsequent
-first-attempt `main` run to produce that complete chain is only a candidate;
-promotion remains a separate reviewed commit. Ingestion and promotion must run
+first-attempt `main` run to produce that complete chain was required to remain
+a candidate until a separate reviewed promotion commit. Ingestion and
+promotion must run
 both the closed schema and the scenario runtime validator; schema-only parsing
 is not an evidence gate for cross-field invariants. The actual CLI argv is
 validated before the observation is emitted and stored as one normalized
 command plus a closed derivation contract rather than duplicated dynamic data.
+
+Run `31305122966` for commit
+`c4a933343b6be315208edd68bb4827650275fcc6` produced the first durable upgrade
+aggregate after both native lanes and strict cleanup passed. Its aggregate and
+Sigstore bundle are retained under `capabilities/cdk/evidence/runs/31305122966/`
+and promote only `bootstrap-upgrade-v28-v32` to scenario-level `cli-pass` for
+Node 22.23.2 and CDK CLI 2.1135.1. The broad `bootstrap` capability remains
+`api-simulated`, language-neutral, and stale with respect to AWS differential
+validation. The remaining bootstrap gap is `clean-bootstrap-create-cli-not-run`;
+Cloud Assembly, application deployment, assets, language bindings, and parity
+remain unproven.
 
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK

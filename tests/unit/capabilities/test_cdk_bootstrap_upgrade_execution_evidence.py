@@ -161,6 +161,9 @@ def test_bootstrap_upgrade_evidence_is_closed_content_addressed_and_not_promotio
     evidence = _aggregate(tmp_path)
 
     validate_aggregate_evidence(evidence)
+    serialized = tmp_path / "aggregate.json"
+    write_canonical_json(serialized, evidence, MAX_EVIDENCE_BYTES)
+    validate_aggregate_evidence(json.loads(serialized.read_bytes()))
     schema = json.loads(
         (
             PROJECT_ROOT / "capabilities/cdk/bootstrap-upgrade-execution-evidence.schema.json"
