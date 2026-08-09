@@ -1,0 +1,18 @@
+Third-party attribution
+=======================
+
+The byte-exact file `tests/aws/templates/cdk_bootstrap_v32.yaml` is from:
+
+AWS Cloud Development Kit (AWS CDK)
+Copyright 2018-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+It is licensed under the Apache License, Version 2.0.
+
+Pinned upstream source:
+https://github.com/aws/aws-cdk-cli/blob/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/lib/api/bootstrap/bootstrap-template.yaml
+
+The upstream license is retained at
+`capabilities/cdk/licenses/aws-cdk-cli-LICENSE`. The pinned upstream NOTICE is
+recorded by immutable URI and digest in the CDK compatibility manifest. Its
+package-level third-party attribution reference remains subject to the fork's
+governance and legal review.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "manifest_sha256": "sha256:d8a484da67660c0caeb4a25a560e025abbc8c9373a83e4f61526bb10d9df0371",
+  "manifest_sha256": "sha256:6e2d3c2546ad1ae5b0948bceb1c7d8dd132a63e2a4343e997e611dad99845eb9",
   "scope": "planning-baseline",
   "sources": [
     {
@@ -13,7 +13,14 @@
       "id": "aws-cdk-bootstrap-v32-template",
       "uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/lib/api/bootstrap/bootstrap-template.yaml",
       "retrieved_at": "2026-08-08",
-      "claim": "byte-exact official bootstrap template version 32"
+      "claim": "byte-exact official bootstrap template version 32",
+      "license": "Apache-2.0",
+      "license_uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/LICENSE",
+      "license_sha256": "sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "local_license_path": "capabilities/cdk/licenses/aws-cdk-cli-LICENSE",
+      "upstream_notice_uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/NOTICE",
+      "upstream_notice_sha256": "sha256:efec97c75d9e6fdad4725c6d9c386f3b2c73008d88245eea51bb842ee07c7592",
+      "local_attribution_path": "NOTICE"
     },
     {
       "id": "aws-cdk-cli-compatibility",

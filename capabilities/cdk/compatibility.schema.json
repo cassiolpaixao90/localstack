@@ -51,7 +51,14 @@
         "id": {"type": "string", "minLength": 1},
         "uri": {"type": "string", "format": "uri"},
         "retrieved_at": {"type": "string", "format": "date"},
-        "claim": {"type": "string", "minLength": 1}
+        "claim": {"type": "string", "minLength": 1},
+        "license": {"type": "string", "minLength": 1},
+        "license_uri": {"type": "string", "format": "uri"},
+        "license_sha256": {"$ref": "#/$defs/hash"},
+        "local_license_path": {"type": "string", "minLength": 1},
+        "upstream_notice_uri": {"type": "string", "format": "uri"},
+        "upstream_notice_sha256": {"$ref": "#/$defs/hash"},
+        "local_attribution_path": {"type": "string", "minLength": 1}
       }
     },
     "policy": {

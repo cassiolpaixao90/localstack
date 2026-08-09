@@ -139,7 +139,27 @@ def test_latest_cdk_bootstrap_template_is_byte_exact_and_pinned():
         "uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/lib/api/bootstrap/bootstrap-template.yaml",
         "retrieved_at": "2026-08-08",
         "claim": "byte-exact official bootstrap template version 32",
+        "license": "Apache-2.0",
+        "license_uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/LICENSE",
+        "license_sha256": "sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "local_license_path": "capabilities/cdk/licenses/aws-cdk-cli-LICENSE",
+        "upstream_notice_uri": "https://raw.githubusercontent.com/aws/aws-cdk-cli/6551740894bf096065331647097c1617e9e4f988/packages/aws-cdk/NOTICE",
+        "upstream_notice_sha256": "sha256:efec97c75d9e6fdad4725c6d9c386f3b2c73008d88245eea51bb842ee07c7592",
+        "local_attribution_path": "NOTICE",
     }
+
+    source = sources[latest["source_id"]]
+    for field in ("local_license_path", "local_attribution_path"):
+        path = Path(source[field])
+        assert not path.is_absolute() and ".." not in path.parts
+        assert (PROJECT_ROOT / path).is_file()
+
+    license_content = (PROJECT_ROOT / source["local_license_path"]).read_bytes()
+    assert source["license_sha256"] == f"sha256:{hashlib.sha256(license_content).hexdigest()}"
+    notice = (PROJECT_ROOT / source["local_attribution_path"]).read_text()
+    assert latest["path"] in notice
+    assert "Copyright 2018-2025 Amazon.com, Inc. or its affiliates. All Rights Reserved." in notice
+    assert latest["upstream_revision"] in notice
 
     template = yaml.safe_load((PROJECT_ROOT / latest["path"]).read_text())
     assert template["Resources"]["CdkBootstrapVersion"]["Properties"]["Value"] == "32"
