@@ -82,6 +82,8 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert 'sudo chown -R "$host_uid:$host_gid" "$gate_root"' in isolated_run
 
     isolated_runner = ISOLATED_RUNNER_PATH.read_text()
+    assert 'chmod -R o+rX,o-w "$workspace"' in isolated_runner
+    assert '/bin/bash "$workspace/scripts/run_cdk_cli_blackbox_isolated.sh" run' in isolated_runner
     assert "ip link set lo up" in isolated_runner
     assert "mount --make-rprivate /" in isolated_runner
     assert "mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run" in isolated_runner

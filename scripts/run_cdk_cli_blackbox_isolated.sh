@@ -25,6 +25,7 @@ case "$mode" in
     readonly machine_arch="$7"
     readonly node_arch="$8"
 
+    chmod -R o+rX,o-w "$workspace"
     chown -R "$sandbox_uid:$sandbox_gid" "$gate_root"
     chmod 0755 "$gate_root" "$gate_root/home" "$gate_root/tmp"
     mount --make-rprivate /
@@ -59,7 +60,7 @@ case "$mode" in
         AWS_SHARED_CREDENTIALS_FILE=/dev/null \
         DISABLE_EVENTS=1 \
         DNS_PORT=4513 \
-        "$workspace/scripts/run_cdk_cli_blackbox_isolated.sh" run
+        /bin/bash "$workspace/scripts/run_cdk_cli_blackbox_isolated.sh" run
     ;;
   run)
     if [[ "$#" -ne 0 ]]; then
