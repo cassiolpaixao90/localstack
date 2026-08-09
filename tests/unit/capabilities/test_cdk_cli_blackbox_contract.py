@@ -101,6 +101,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert "--bounding-set=-all" in isolated_runner
     assert "env -i" in isolated_runner
     assert 'PATH="$node_dir:/usr/sbin:/usr/bin:/sbin:/bin"' in isolated_runner
+    assert 'PYTHONPATH="$sandbox_workspace/localstack-core"' in isolated_runner
     assert "TEST_TARGET=LOCALSTACK" in isolated_runner
     assert "CDK_REAL_CLI_REQUIRED=1" in isolated_runner
     assert 'if [[ -w "$WORKSPACE" ]]' in isolated_runner

@@ -58,6 +58,7 @@ case "$mode" in
         CDK_EXPECTED_NODE_ARCH="$node_arch" \
         PYTHONDONTWRITEBYTECODE=1 \
         PYTHONNOUSERSITE=1 \
+        PYTHONPATH="$sandbox_workspace/localstack-core" \
         TEST_TARGET=LOCALSTACK \
         CDK_REAL_CLI_REQUIRED=1 \
         AWS_ACCESS_KEY_ID=test \
