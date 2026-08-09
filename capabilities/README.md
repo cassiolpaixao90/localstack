@@ -52,10 +52,10 @@ trusted CI configuration or attestation. Never derive
 `CAPABILITY_INVENTORY_SHA256` from the catalog in the same untrusted step. It
 then streams CSV rows, checks each operation against that catalog, and hashes
 the exact byte stream being parsed. File count, input bytes, header, record,
-field, trace, and diagnostic cardinality all have fail-closed ceilings. Output
-is written atomically and conforms to `evidence.schema.json`. Raw metric CSVs
-can contain request details and remain private CI artifacts under `target/`;
-do not commit them.
+field, trace, and diagnostic cardinality all have fail-closed ceilings. The
+catalog JSON is capped at 4 MiB before decoding. Output is written atomically
+and conforms to `evidence.schema.json`. Raw metric CSVs can contain request
+details and remain private CI artifacts under `target/`; do not commit them.
 
 `--source-commit` is a caller-supplied declaration in this informational
 overlay, not an authenticated provenance claim. A promotion workflow must bind

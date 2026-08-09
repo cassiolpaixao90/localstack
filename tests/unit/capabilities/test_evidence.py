@@ -1,11 +1,13 @@
 import csv
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from localstack.capabilities.evidence import (
+    MAX_CATALOG_BYTES,
     EvidenceError,
     EvidenceLimits,
     classify_dispatch_trace,
@@ -379,6 +381,13 @@ def test_bundle_matches_committed_schema(tmp_path: Path):
     validator(schema, format_checker=validator.FORMAT_CHECKER).validate(bundle)
 
 
+def test_committed_catalog_fits_cli_decode_budget():
+    project_root = Path(__file__).parents[3]
+    catalog = project_root / "capabilities/generated/capabilities.json"
+
+    assert catalog.stat().st_size <= MAX_CATALOG_BYTES
+
+
 def test_cli_writes_overlay_atomically(tmp_path: Path):
     metrics = tmp_path / "metrics.csv"
     catalog = tmp_path / "catalog.json"
@@ -443,6 +452,113 @@ def test_cli_preserves_previous_output_when_atomic_replace_fails(tmp_path: Path,
     assert exit_code == 1
     assert output.read_text() == "previous\n"
     assert not list(tmp_path.glob(f".{output.name}.*.tmp"))
+
+
+def test_cli_rejects_catalog_before_reading_past_byte_limit(tmp_path: Path, monkeypatch):
+    from localstack.capabilities import evidence as evidence_module
+
+    metrics = tmp_path / "metrics.csv"
+    catalog = tmp_path / "catalog.json"
+    output = tmp_path / "evidence.json"
+    _write_metrics(metrics, [_row()])
+    monkeypatch.setattr(evidence_module, "MAX_CATALOG_BYTES", 16)
+    catalog.write_bytes(b" " * 17)
+
+    exit_code = main(
+        [
+            "--catalog",
+            str(catalog),
+            "--metrics",
+            str(metrics),
+            "--observed-at",
+            "2026-08-08T18:00:00Z",
+            "--source-commit",
+            "7" * 40,
+            "--expected-inventory-sha256",
+            "sha256:" + "1" * 64,
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 1
+    assert not output.exists()
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="FIFO requires POSIX")
+def test_cli_rejects_fifo_catalog_without_blocking(tmp_path: Path):
+    metrics = tmp_path / "metrics.csv"
+    catalog = tmp_path / "catalog.fifo"
+    output = tmp_path / "evidence.json"
+    _write_metrics(metrics, [_row()])
+    os.mkfifo(catalog)
+
+    exit_code = main(
+        [
+            "--catalog",
+            str(catalog),
+            "--metrics",
+            str(metrics),
+            "--observed-at",
+            "2026-08-08T18:00:00Z",
+            "--source-commit",
+            "7" * 40,
+            "--expected-inventory-sha256",
+            "sha256:" + "1" * 64,
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 1
+    assert not output.exists()
+
+
+def test_cli_converts_oversized_json_integer_to_bounded_error(tmp_path: Path):
+    metrics = tmp_path / "metrics.csv"
+    catalog = tmp_path / "catalog.json"
+    output = tmp_path / "evidence.json"
+    _write_metrics(metrics, [_row()])
+    catalog.write_bytes(b'{"value":' + b"9" * 5_000 + b"}")
+
+    exit_code = main(
+        [
+            "--catalog",
+            str(catalog),
+            "--metrics",
+            str(metrics),
+            "--observed-at",
+            "2026-08-08T18:00:00Z",
+            "--source-commit",
+            "7" * 40,
+            "--expected-inventory-sha256",
+            "sha256:" + "1" * 64,
+            "--output",
+            str(output),
+        ]
+    )
+
+    assert exit_code == 1
+    assert not output.exists()
+
+
+def test_rejects_catalog_with_excessive_nesting_as_evidence_error(tmp_path: Path):
+    metrics = tmp_path / "metrics.csv"
+    _write_metrics(metrics, [_row()])
+    catalog = _catalog()
+    nested = []
+    for _ in range(20_000):
+        nested = [nested]
+    catalog["nested"] = nested
+
+    with pytest.raises(EvidenceError, match="not canonical JSON"):
+        _build_evidence_bundle(
+            catalog,
+            [metrics],
+            observed_at="2026-08-08T18:00:00Z",
+            source_commit="7" * 40,
+            expected_inventory_sha256=catalog["inventory_sha256"],
+        )
 
 
 def test_rejects_legacy_header_without_dispatch_trace(tmp_path: Path):

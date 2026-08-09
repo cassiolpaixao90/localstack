@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
 import tempfile
 from collections import Counter
@@ -20,6 +21,7 @@ from jsonschema.exceptions import SchemaError, ValidationError
 from jsonschema.validators import validator_for
 
 EVIDENCE_SCHEMA_VERSION = 1
+MAX_CATALOG_BYTES = 4 * 1024 * 1024
 TRACE_CLASSES = (
     "native-observed",
     "fallback-observed",
@@ -226,13 +228,13 @@ def _catalog_operations(
         raise EvidenceError("capability catalog does not match the expected inventory digest")
     try:
         actual_inventory_sha256 = _sha256(inventory_payload)
-    except (TypeError, ValueError) as error:
+    except (RecursionError, TypeError, ValueError) as error:
         raise EvidenceError("capability catalog is not canonical JSON") from error
     if inventory_sha256 != actual_inventory_sha256:
         raise EvidenceError("capability catalog inventory digest does not match its content")
     try:
         _catalog_validator().validate(catalog)
-    except ValidationError as error:
+    except (RecursionError, ValidationError) as error:
         raise EvidenceError("capability catalog does not match the closed schema") from error
 
     result: set[tuple[str, str]] = set()
@@ -609,6 +611,28 @@ def _write_atomic(output: Path, content: str) -> None:
             temporary_path.unlink(missing_ok=True)
 
 
+def _load_catalog(path: Path) -> Any:
+    flags = os.O_RDONLY
+    for optional_flag in ("O_BINARY", "O_CLOEXEC", "O_NONBLOCK"):
+        flags |= getattr(os, optional_flag, 0)
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            raise EvidenceError("capability catalog must be a regular file")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = -1
+            payload = stream.read(MAX_CATALOG_BYTES + 1)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    if len(payload) > MAX_CATALOG_BYTES:
+        raise EvidenceError(f"capability catalog exceeds the {MAX_CATALOG_BYTES} byte limit")
+    try:
+        return json.loads(payload)
+    except (RecursionError, UnicodeDecodeError, ValueError) as error:
+        raise EvidenceError("capability catalog JSON is not safely decodable") from error
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Build an informational AWS dispatch evidence overlay"
@@ -634,8 +658,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        with Path(args.catalog).open(encoding="utf-8") as stream:
-            catalog = json.load(stream)
+        catalog = _load_catalog(Path(args.catalog))
         bundle = build_evidence_bundle(
             catalog,
             args.metrics,
