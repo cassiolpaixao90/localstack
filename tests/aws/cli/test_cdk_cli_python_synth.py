@@ -17,10 +17,11 @@ from jsonschema import Draft7Validator
 from localstack.cli.cdk import launch_cdk
 from localstack.testing.pytest import markers
 from tests.aws.cli.execution_evidence import read_regular_bounded, write_canonical_json
-from tests.aws.cli.python_synth_execution_evidence import (
+from tests.aws.cli.python_synth_execution_evidence_v2 import (
     MAX_OBSERVATION_BYTES,
     create_observation,
 )
+from tests.aws.cli.python_synth_toolchain import validate_installed_environment
 from tests.aws.cli.test_cdk_cli_bootstrap_upgrade import CdkRuntime
 
 pytest_plugins = ("tests.aws.cli.test_cdk_cli_bootstrap_upgrade",)
@@ -280,15 +281,41 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
         not _REQUIRED or all(evidence_environment.values()),
         "the required Python synth gate needs complete evidence metadata",
     )
-    for distribution, expected in PINNED_PYTHON_PACKAGES.items():
-        try:
-            actual = importlib.metadata.version(distribution)
-        except importlib.metadata.PackageNotFoundError:
-            _require(False, f"the pinned Python package is not installed: {distribution}")
-        else:
-            _require(actual == expected, f"{distribution} {expected} is required")
-
-    python = _python_interpreter_path(sys.executable)
+    configured_python = os.environ.get("CDK_PYTHON_SYNTH_PYTHON")
+    configured_manifest = os.environ.get("CDK_PYTHON_SYNTH_TOOLCHAIN_MANIFEST")
+    toolchain_manifest_path = None
+    if (configured_python or configured_manifest) and not _REQUIRED:
+        pytest.fail("the isolated Python synth toolchain is restricted to the required CI lane")
+    _require(
+        not _REQUIRED or (configured_python is not None and configured_manifest is not None),
+        "the required Python synth gate needs its isolated toolchain",
+    )
+    if configured_python and configured_manifest:
+        python = _python_interpreter_path(configured_python)
+        toolchain_manifest_path = Path(configured_manifest)
+        toolchain_manifest = validate_installed_environment(python, toolchain_manifest_path)
+        _require(
+            not os.access(python.parent.parent, os.W_OK),
+            "the isolated Python synth environment must be read-only",
+        )
+        _require(
+            not os.access(toolchain_manifest_path, os.W_OK),
+            "the Python synth toolchain manifest must be read-only",
+        )
+        installed = {item["project"]: item["version"] for item in toolchain_manifest["installed"]}
+        _require(
+            all(installed.get(name) == version for name, version in PINNED_PYTHON_PACKAGES.items()),
+            "the isolated Python synth package versions do not match the pinned contract",
+        )
+    else:
+        python = _python_interpreter_path(sys.executable)
+        for distribution, expected in PINNED_PYTHON_PACKAGES.items():
+            try:
+                actual = importlib.metadata.version(distribution)
+            except importlib.metadata.PackageNotFoundError:
+                _require(False, f"the pinned Python package is not installed: {distribution}")
+            else:
+                _require(actual == expected, f"{distribution} {expected} is required")
     app = APP_PATH.resolve()
     app_command = _python_app_command(python, app)
     environment = dict(pinned_cdk_cli_runtime.environment)
@@ -500,6 +527,7 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
     assert tree == _expected_tree()
 
     if observation_path:
+        assert toolchain_manifest_path is not None
         observation = create_observation(
             platform_id=f"linux-{evidence_environment['RESULT_ARCH']}",
             machine_arch=evidence_environment["CDK_EXPECTED_MACHINE_ARCH"],
@@ -519,6 +547,7 @@ def test_cdk_cli_synthesizes_minimal_python_sqs_app(
             argv=argv,
             assembly_files=assembly_files,
             schema_payload=schema_payload,
+            toolchain_manifest_path=toolchain_manifest_path,
             returncode=result.returncode,
             timed_out=result.timed_out,
             duration_ms=duration_ms,

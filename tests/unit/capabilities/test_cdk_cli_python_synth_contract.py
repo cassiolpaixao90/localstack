@@ -30,7 +30,7 @@ def test_python_synth_uses_existing_exact_package_pins_and_default_synthesizer()
 
 
 def test_python_synth_pinned_cloud_assembly_schema_is_valid():
-    schema = _load_pinned_assembly_schema()
+    schema, _payload = _load_pinned_assembly_schema()
 
     Draft7Validator.check_schema(schema)
 

@@ -1,0 +1,76 @@
+{
+  "typeName": "AWS::Cognito::UserPoolRegionalConfigurationAttachment",
+  "description": "Replica-region-specific Cognito user pool configuration.",
+  "additionalProperties": false,
+  "properties": {
+    "EmailConfiguration": {"$ref": "#/definitions/emailConfiguration"},
+    "LambdaConfig": {"$ref": "#/definitions/lambdaConfig"},
+    "SmsConfiguration": {"$ref": "#/definitions/smsConfiguration"},
+    "Status": {"type": "string", "enum": ["ACTIVE", "INACTIVE"]},
+    "UserPoolId": {"type": "string", "minLength": 1, "maxLength": 55, "pattern": "^[\\w-]+_[0-9a-zA-Z]+$"},
+    "UserPoolTags": {
+      "type": "object",
+      "maxProperties": 50,
+      "additionalProperties": {"type": "string", "maxLength": 256}
+    }
+  },
+  "definitions": {
+    "emailConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ConfigurationSet": {"type": "string"},
+        "EmailSendingAccount": {"type": "string"},
+        "From": {"type": "string"},
+        "ReplyToEmailAddress": {"type": "string"},
+        "SourceArn": {"type": "string"}
+      }
+    },
+    "lambdaConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "CreateAuthChallenge": {"type": "string"},
+        "CustomEmailSender": {"type": "object"},
+        "CustomMessage": {"type": "string"},
+        "CustomSMSSender": {"type": "object"},
+        "DefineAuthChallenge": {"type": "string"},
+        "InboundFederation": {"type": "object"},
+        "KMSKeyID": {"type": "string"},
+        "PostAuthentication": {"type": "string"},
+        "PostConfirmation": {"type": "string"},
+        "PreAuthentication": {"type": "string"},
+        "PreSignUp": {"type": "string"},
+        "PreTokenGeneration": {"type": "string"},
+        "PreTokenGenerationConfig": {"type": "object"},
+        "UserMigration": {"type": "string"},
+        "VerifyAuthChallengeResponse": {"type": "string"}
+      }
+    },
+    "smsConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ExternalId": {"type": "string"},
+        "SnsCallerArn": {"type": "string"},
+        "SnsRegion": {"type": "string"}
+      }
+    }
+  },
+  "required": ["UserPoolId"],
+  "primaryIdentifier": ["/properties/UserPoolId"],
+  "createOnlyProperties": ["/properties/UserPoolId"],
+  "tagging": {
+    "taggable": true,
+    "tagOnCreate": true,
+    "tagUpdatable": true,
+    "cloudFormationSystemTags": true,
+    "tagProperty": "/properties/UserPoolTags"
+  },
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:DescribeUserPool", "cognito-idp:ListUserPoolReplicas", "cognito-idp:ListTagsForResource", "cognito-idp:TagResource", "cognito-idp:UntagResource", "cognito-idp:UpdateUserPool", "cognito-idp:UpdateUserPoolReplica"]},
+    "read": {"permissions": ["cognito-idp:DescribeUserPool", "cognito-idp:ListUserPoolReplicas", "cognito-idp:ListTagsForResource"]},
+    "update": {"permissions": ["cognito-idp:DescribeUserPool", "cognito-idp:ListUserPoolReplicas", "cognito-idp:ListTagsForResource", "cognito-idp:TagResource", "cognito-idp:UntagResource", "cognito-idp:UpdateUserPool", "cognito-idp:UpdateUserPoolReplica"]},
+    "delete": {"permissions": ["cognito-idp:DescribeUserPool", "cognito-idp:ListUserPoolReplicas", "cognito-idp:ListTagsForResource", "cognito-idp:UntagResource", "cognito-idp:UpdateUserPool", "cognito-idp:UpdateUserPoolReplica"]}
+  }
+}

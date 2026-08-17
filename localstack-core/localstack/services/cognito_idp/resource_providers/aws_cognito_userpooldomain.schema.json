@@ -1,0 +1,41 @@
+{
+  "typeName": "AWS::Cognito::UserPoolDomain",
+  "description": "A native Cognito prefix domain for hosted UI and managed login.",
+  "additionalProperties": false,
+  "properties": {
+    "CloudFrontDistribution": {"type": "string"},
+    "CustomDomainConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["CertificateArn"],
+      "properties": {"CertificateArn": {"type": "string"}}
+    },
+    "Domain": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 63,
+      "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+    },
+    "ManagedLoginVersion": {"type": "integer", "enum": [1, 2]},
+    "Routing": {"type": "object"},
+    "UserPoolId": {"type": "string", "minLength": 1}
+  },
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/Domain"],
+  "required": ["Domain", "UserPoolId"],
+  "readOnlyProperties": ["/properties/CloudFrontDistribution"],
+  "writeOnlyProperties": ["/properties/ManagedLoginVersion"],
+  "createOnlyProperties": ["/properties/Domain", "/properties/UserPoolId"],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {
+      "permissions": ["cognito-idp:CreateUserPoolDomain", "cognito-idp:DescribeUserPoolDomain"]
+    },
+    "read": {"permissions": ["cognito-idp:DescribeUserPoolDomain"]},
+    "update": {
+      "permissions": ["cognito-idp:DescribeUserPoolDomain", "cognito-idp:UpdateUserPoolDomain"]
+    },
+    "delete": {
+      "permissions": ["cognito-idp:DeleteUserPoolDomain", "cognito-idp:DescribeUserPoolDomain"]
+    }
+  }
+}

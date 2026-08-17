@@ -12,6 +12,17 @@ from localstack.services.sqs.resource_providers.generated.aws_sqs_queueinlinepol
 )
 
 
+def _not_found(queue: str) -> ProgressEvent[SQSQueueInlinePolicyProperties]:
+    return ProgressEvent(
+        status=OperationStatus.FAILED,
+        message=(
+            "Resource of type 'AWS::SQS::QueueInlinePolicy' "
+            f"with identifier '{queue}' was not found."
+        ),
+        error_code="NotFound",
+    )
+
+
 class SQSQueueInlinePolicyProvider(SQSQueueInlinePolicyProviderBase):
     def create(
         self,
@@ -34,7 +45,25 @@ class SQSQueueInlinePolicyProvider(SQSQueueInlinePolicyProviderBase):
         self,
         request: ResourceRequest[SQSQueueInlinePolicyProperties],
     ) -> ProgressEvent[SQSQueueInlinePolicyProperties]:
-        raise NotImplementedError
+        sqs = request.aws_client_factory.sqs
+        queue = request.desired_state["Queue"]
+        try:
+            policy = sqs.get_queue_attributes(
+                QueueUrl=queue, AttributeNames=["Policy"]
+            ).get("Attributes", {}).get("Policy")
+        except sqs.exceptions.QueueDoesNotExist:
+            return _not_found(queue)
+        if not policy:
+            return _not_found(queue)
+
+        return ProgressEvent(
+            status=OperationStatus.SUCCESS,
+            resource_model=SQSQueueInlinePolicyProperties(
+                Queue=queue,
+                PolicyDocument=json.loads(policy),
+            ),
+            custom_context=request.custom_context,
+        )
 
     def delete(
         self,
@@ -44,7 +73,15 @@ class SQSQueueInlinePolicyProvider(SQSQueueInlinePolicyProviderBase):
         sqs = request.aws_client_factory.sqs
 
         queue = model.get("Queue")
-        sqs.set_queue_attributes(QueueUrl=queue, Attributes={"Policy": ""})
+        try:
+            current_policy = sqs.get_queue_attributes(
+                QueueUrl=queue, AttributeNames=["Policy"]
+            ).get("Attributes", {}).get("Policy")
+            expected_policy = model.get("PolicyDocument")
+            if current_policy and expected_policy and json.loads(current_policy) == expected_policy:
+                sqs.set_queue_attributes(QueueUrl=queue, Attributes={"Policy": ""})
+        except sqs.exceptions.QueueDoesNotExist:
+            pass
 
         return ProgressEvent(status=OperationStatus.SUCCESS, resource_model={})
 

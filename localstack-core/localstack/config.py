@@ -311,8 +311,7 @@ def in_docker():
 
     # check some marker files that we create in our Dockerfiles
     for path in [
-        "/usr/lib/localstack/.community-version",
-        "/usr/lib/localstack/.pro-version",
+        "/usr/lib/localstack/.unified-version",
         "/tmp/localstack/.marker",
     ]:
         if os.path.isfile(path):
@@ -780,6 +779,16 @@ DISABLE_CUSTOM_CORS_APIGATEWAY = is_env_true("DISABLE_CUSTOM_CORS_APIGATEWAY")
 EXTRA_CORS_ALLOWED_HEADERS = os.environ.get("EXTRA_CORS_ALLOWED_HEADERS", "").strip()
 EXTRA_CORS_EXPOSE_HEADERS = os.environ.get("EXTRA_CORS_EXPOSE_HEADERS", "").strip()
 EXTRA_CORS_ALLOWED_ORIGINS = os.environ.get("EXTRA_CORS_ALLOWED_ORIGINS", "").strip()
+COGNITO_IDP_EGRESS_ALLOWLIST = [
+    value.strip()
+    for value in os.environ.get("COGNITO_IDP_EGRESS_ALLOWLIST", "").split(",")
+    if value.strip()
+]
+COGNITO_IDP_SOCIAL_ENDPOINTS = [
+    value.strip()
+    for value in os.environ.get("COGNITO_IDP_SOCIAL_ENDPOINTS", "").split(",")
+    if value.strip()
+]
 DISABLE_PREFLIGHT_PROCESSING = is_env_true("DISABLE_PREFLIGHT_PROCESSING")
 
 # whether to disable publishing events to the API

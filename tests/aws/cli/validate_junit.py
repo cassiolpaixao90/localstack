@@ -19,6 +19,10 @@ EXPECTED_TESTS = {
         "tests.aws.cli.test_cdk_cli_python_synth",
         "test_cdk_cli_synthesizes_minimal_python_sqs_app",
     ),
+    "deploy-python-apigateway-mock-v1": (
+        "tests.aws.cli.test_cdk_cli_apigateway_deploy",
+        "test_cdk_cli_deploys_invokes_and_cleans_up_enterprise_apigateway",
+    ),
 }
 
 

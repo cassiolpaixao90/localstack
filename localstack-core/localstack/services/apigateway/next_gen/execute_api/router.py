@@ -1,4 +1,5 @@
 import logging
+import threading
 from typing import TypedDict, Unpack
 
 from rolo import Request, Router
@@ -10,6 +11,8 @@ from localstack.constants import APPLICATION_JSON, AWS_REGION_US_EAST_1, DEFAULT
 from localstack.deprecations import deprecated_endpoint
 from localstack.http import Response
 from localstack.services.apigateway.models import ApiGatewayStore, apigateway_stores
+from localstack.services.apigatewayv2.execute_api import HttpApiGatewayEndpoint
+from localstack.services.apigatewayv2.models import apigatewayv2_stores
 from localstack.services.edge import ROUTER
 from localstack.services.stores import AccountRegionBundle
 
@@ -20,6 +23,9 @@ from .moto_helpers import get_stage_configuration
 
 LOG = logging.getLogger(__name__)
 
+_SHARED_ROUTER = None
+_SHARED_ROUTER_LOCK = threading.RLock()
+
 
 class RouteHostPathParameters(TypedDict, total=False):
     """
@@ -28,6 +34,7 @@ class RouteHostPathParameters(TypedDict, total=False):
     """
 
     api_id: str
+    custom_domain: str
     path: str
     port: int | None
     server: str | None
@@ -43,8 +50,14 @@ class ApiGatewayEndpoint:
     Gateway to be processed by the handler chain.
     """
 
-    def __init__(self, rest_gateway: RestApiGateway = None, store: AccountRegionBundle = None):
+    def __init__(
+        self,
+        rest_gateway: RestApiGateway = None,
+        store: AccountRegionBundle = None,
+        http_endpoint: HttpApiGatewayEndpoint = None,
+    ):
         self.rest_gateway = rest_gateway or RestApiGateway()
+        self.http_endpoint = http_endpoint or HttpApiGatewayEndpoint()
         # we only access CrossAccount attributes in the handler, so we use a global store in default account and region
         self._store = store or apigateway_stores
 
@@ -65,6 +78,10 @@ class ApiGatewayEndpoint:
             context, response = self.prepare_rest_api_invocation(request, api_id, stage)
             self.rest_gateway.process_with_context(context, response)
             return response
+        elif self.http_endpoint.is_http_api(api_id):
+            return self.http_endpoint(
+                request, api_id=api_id, stage=stage, path=kwargs.get("path", "")
+            )
         else:
             return self.create_not_found_response(api_id)
 
@@ -152,6 +169,15 @@ class ApiGatewayEndpoint:
         kwargs["api_id"] = request.headers.get("x-apigw-api-id")
         return self.__call__(request, **kwargs)
 
+    def custom_domain_handler(
+        self, request: Request, **kwargs: Unpack[RouteHostPathParameters]
+    ) -> Response:
+        return self.http_endpoint(
+            request,
+            custom_domain=kwargs.get("custom_domain", ""),
+            path=kwargs.get("path", ""),
+        )
+
 
 class ApiGatewayRouter:
     router: Router[Handler]
@@ -162,8 +188,11 @@ class ApiGatewayRouter:
         self.router = router or ROUTER
         self.handler = handler or ApiGatewayEndpoint()
         self.registered_rules: list[Rule] = []
+        self.custom_domain_rules: dict[str, list[Rule]] = {}
 
     def register_routes(self) -> None:
+        if self.registered_rules:
+            return
         LOG.debug("Registering API Gateway routes.")
         host_pattern = "<regex('.+?'):api_id><regex('(-vpce-[^.]+)?'):vpce_suffix>.execute-api.<regex('.*'):server>"
         vpce_host_pattern = (
@@ -249,5 +278,67 @@ class ApiGatewayRouter:
         for rule in rules:
             self.registered_rules.append(rule)
 
+    def register_custom_domain(self, domain_name: str) -> None:
+        domain_name = domain_name.lower()
+        if domain_name in self.custom_domain_rules:
+            return
+        port = "<port:port>"
+        if domain_name.startswith("*."):
+            label = r"<regex('[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?'):domain_label>"
+            host = f"{label}.{domain_name[2:]}{port}"
+        else:
+            host = f"{domain_name}{port}"
+        rules: list[Rule] = []
+        try:
+            rules.append(
+                self.router.add(
+                    path="/",
+                    host=host,
+                    endpoint=self.handler.custom_domain_handler,
+                    defaults={"custom_domain": domain_name, "path": ""},
+                    strict_slashes=True,
+                )
+            )
+            rules.append(
+                self.router.add(
+                    path="/<path:path>",
+                    host=host,
+                    endpoint=self.handler.custom_domain_handler,
+                    defaults={"custom_domain": domain_name},
+                    strict_slashes=True,
+                )
+            )
+        except Exception:
+            self.router.remove(rules)
+            raise
+        self.custom_domain_rules[domain_name] = rules
+
+    def unregister_custom_domain(self, domain_name: str) -> None:
+        rules = self.custom_domain_rules.pop(domain_name.lower(), ())
+        self.router.remove(rules)
+
+    def sync_custom_domains(self) -> None:
+        with apigatewayv2_stores.lock:
+            desired = {
+                domain_name
+                for _, _, store in apigatewayv2_stores.iter_stores()
+                for domain_name in store.domain_names
+            }
+        for domain_name in sorted(set(self.custom_domain_rules) - desired):
+            self.unregister_custom_domain(domain_name)
+        for domain_name in sorted(desired - set(self.custom_domain_rules)):
+            self.register_custom_domain(domain_name)
+
     def unregister_routes(self):
+        for domain_name in list(self.custom_domain_rules):
+            self.unregister_custom_domain(domain_name)
         self.router.remove(self.registered_rules)
+        self.registered_rules.clear()
+
+
+def get_api_gateway_router() -> ApiGatewayRouter:
+    global _SHARED_ROUTER
+    with _SHARED_ROUTER_LOCK:
+        if _SHARED_ROUTER is None:
+            _SHARED_ROUTER = ApiGatewayRouter()
+        return _SHARED_ROUTER

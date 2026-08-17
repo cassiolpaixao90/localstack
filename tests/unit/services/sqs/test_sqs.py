@@ -4,12 +4,14 @@ import localstack.services.sqs.exceptions
 import localstack.services.sqs.models
 from localstack.services.sqs import provider
 from localstack.services.sqs.constants import DEFAULT_MAXIMUM_MESSAGE_SIZE
+from localstack.services.sqs.exceptions import InvalidAttributeValue
 from localstack.services.sqs.utils import (
     create_message_attribute_hash,
     guess_endpoint_strategy_and_host,
     is_sqs_queue_url,
     parse_queue_url,
 )
+from localstack.testing.config import TEST_AWS_ACCOUNT_ID, TEST_AWS_REGION_NAME
 from localstack.utils.common import convert_to_printable_chars
 
 
@@ -42,6 +44,29 @@ def test_parse_max_receive_count_string_in_redrive_policy():
     # fmt: on
     queue = localstack.services.sqs.models.SqsQueue("TestQueue", "us-east-1", "123456789", policy)
     assert queue.max_receive_count == 5
+
+
+@pytest.mark.parametrize("value", ["-1", "21", "not-an-integer"])
+def test_queue_rejects_invalid_receive_message_wait_time(value):
+    with pytest.raises(InvalidAttributeValue):
+        localstack.services.sqs.models.SqsQueue(
+            "TestQueue",
+            TEST_AWS_REGION_NAME,
+            TEST_AWS_ACCOUNT_ID,
+            {"ReceiveMessageWaitTimeSeconds": value},
+        )
+
+
+@pytest.mark.parametrize("value", ["0", "20"])
+def test_queue_accepts_receive_message_wait_time_boundaries(value):
+    queue = localstack.services.sqs.models.SqsQueue(
+        "TestQueue",
+        TEST_AWS_REGION_NAME,
+        TEST_AWS_ACCOUNT_ID,
+        {"ReceiveMessageWaitTimeSeconds": value},
+    )
+
+    assert queue.wait_time_seconds == int(value)
 
 
 def test_except_check_message_max_size():

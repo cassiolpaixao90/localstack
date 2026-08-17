@@ -14,6 +14,42 @@ from localstack.utils.ssl import get_cert_pem_file_path
 LOG = logging.getLogger(__name__)
 
 
+def _native_snapshot_load_enabled() -> bool:
+    return config.PERSISTENCE and config.SNAPSHOT_LOAD_STRATEGY in {"", "ON_STARTUP"}
+
+
+def _native_snapshot_save_enabled() -> bool:
+    # This persistence subset has no on-request implementation. Unsupported strategies stay off.
+    return config.PERSISTENCE and config.SNAPSHOT_SAVE_STRATEGY in {"", "ON_SHUTDOWN"}
+
+
+@hooks.on_infra_start(priority=200, should_load=_native_snapshot_load_enabled)
+def load_native_service_snapshots() -> None:
+    from localstack.state.service_persistence import (
+        load_service_snapshots,
+        native_service_stores,
+    )
+
+    load_service_snapshots(config.dirs.data, native_service_stores())
+    from localstack.services.apigateway.next_gen.execute_api.router import (
+        get_api_gateway_router,
+    )
+
+    router = get_api_gateway_router()
+    router.register_routes()
+    router.sync_custom_domains()
+
+
+@hooks.on_infra_shutdown(priority=100, should_load=_native_snapshot_save_enabled)
+def save_native_service_snapshots() -> None:
+    from localstack.state.service_persistence import (
+        native_service_stores,
+        save_service_snapshots,
+    )
+
+    save_service_snapshots(config.dirs.data, native_service_stores())
+
+
 @hooks.on_infra_start()
 def deprecation_warnings() -> None:
     LOG.debug("Checking for the usage of deprecated community features and configs...")

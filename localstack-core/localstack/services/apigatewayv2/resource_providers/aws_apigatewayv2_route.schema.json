@@ -1,0 +1,28 @@
+{
+  "typeName": "AWS::ApiGatewayV2::Route",
+  "description": "Native LocalStack HTTP API route subset",
+  "additionalProperties": false,
+  "primaryIdentifier": ["/properties/ApiId", "/properties/RouteId"],
+  "readOnlyProperties": ["/properties/ApiGatewayManaged", "/properties/RouteId"],
+  "createOnlyProperties": ["/properties/ApiId"],
+  "properties": {
+    "ApiGatewayManaged": {"type": "boolean"},
+    "ApiId": {"type": "string"},
+    "ApiKeyRequired": {"type": "boolean"},
+    "AuthorizationScopes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "AuthorizationType": {"type": "string", "enum": ["JWT", "NONE"]},
+    "AuthorizerId": {"type": "string"},
+    "OperationName": {"type": "string"},
+    "RouteId": {"type": "string"},
+    "RouteKey": {"type": "string", "minLength": 1},
+    "Target": {"type": "string", "minLength": 1}
+  },
+  "required": ["ApiId", "RouteKey", "Target"],
+  "handlers": {
+    "create": {"permissions": ["apigateway:POST"]},
+    "read": {"permissions": ["apigateway:GET"]},
+    "list": {"permissions": ["apigateway:GET"]},
+    "update": {"permissions": ["apigateway:PATCH"]},
+    "delete": {"permissions": ["apigateway:DELETE"]}
+  }
+}

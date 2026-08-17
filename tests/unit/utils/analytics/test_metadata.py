@@ -60,16 +60,18 @@ def test_get_session_id_cache_not_process_local():
 @pytest.mark.parametrize(
     "expected_edition, version_file",
     [
-        ("enterprise", ".enterprise-version"),
-        ("pro", ".pro-version"),
-        ("community", ".community-version"),
-        ("azure-alpha", ".azure-alpha-version"),
+        ("unified", ".unified-version"),
+        ("unknown", ".enterprise-version"),
+        ("unknown", ".pro-version"),
+        ("unknown", ".community-version"),
+        ("unknown", ".azure-alpha-version"),
         ("unknown", "non-hidden-version"),
         ("unknown", ".hidden-file"),
         ("unknown", "not-a-version-file"),
     ],
 )
-def test_get_localstack_edition(expected_edition, version_file):
+def test_get_localstack_edition(expected_edition, version_file, monkeypatch, tmp_path):
+    monkeypatch.setattr(config.dirs, "static_libs", str(tmp_path))
     # put the version file in the expected location
     file_location = os.path.join(config.dirs.static_libs, version_file)
     with open(file_location, "w") as f:

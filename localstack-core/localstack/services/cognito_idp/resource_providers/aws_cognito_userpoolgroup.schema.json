@@ -1,0 +1,23 @@
+{
+  "typeName": "AWS::Cognito::UserPoolGroup",
+  "description": "A native Cognito user-pool group.",
+  "additionalProperties": false,
+  "properties": {
+    "Description": {"type": "string", "maxLength": 2048},
+    "GroupName": {"type": "string", "minLength": 1, "maxLength": 128},
+    "Precedence": {"type": "integer", "minimum": 0, "maximum": 2147483647},
+    "RoleArn": {"type": "string", "minLength": 20, "maxLength": 2048},
+    "UserPoolId": {"type": "string", "minLength": 1}
+  },
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/GroupName"],
+  "required": ["UserPoolId"],
+  "createOnlyProperties": ["/properties/UserPoolId", "/properties/GroupName"],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:CreateGroup"]},
+    "read": {"permissions": ["cognito-idp:GetGroup"]},
+    "update": {"permissions": ["cognito-idp:GetGroup", "cognito-idp:UpdateGroup"]},
+    "delete": {"permissions": ["cognito-idp:DeleteGroup"]},
+    "list": {"permissions": ["cognito-idp:ListGroups"]}
+  }
+}

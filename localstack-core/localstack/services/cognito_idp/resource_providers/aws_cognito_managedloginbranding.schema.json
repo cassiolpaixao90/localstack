@@ -1,0 +1,39 @@
+{
+  "typeName": "AWS::Cognito::ManagedLoginBranding",
+  "description": "A managed login branding style associated with a Cognito app client.",
+  "properties": {
+    "Assets": {"type": "array", "maxItems": 40, "items": {"$ref": "#/definitions/Asset"}},
+    "ClientId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[\\w+]+$"},
+    "ManagedLoginBrandingId": {"type": "string", "format": "uuid"},
+    "ReturnMergedResources": {"type": "boolean"},
+    "Settings": {"type": "object"},
+    "UseCognitoProvidedValues": {"type": "boolean"},
+    "UserPoolId": {"type": "string", "minLength": 1, "maxLength": 55, "pattern": "^[\\w-]+_[0-9A-Za-z]+$"}
+  },
+  "definitions": {
+    "Asset": {
+      "type": "object",
+      "properties": {
+        "Bytes": {"type": "string", "maxLength": 1333336},
+        "Category": {"type": "string", "enum": ["FAVICON_ICO", "FAVICON_SVG", "EMAIL_GRAPHIC", "SMS_GRAPHIC", "AUTH_APP_GRAPHIC", "PASSWORD_GRAPHIC", "PASSKEY_GRAPHIC", "PAGE_HEADER_LOGO", "PAGE_HEADER_BACKGROUND", "PAGE_FOOTER_LOGO", "PAGE_FOOTER_BACKGROUND", "PAGE_BACKGROUND", "FORM_BACKGROUND", "FORM_LOGO", "IDP_BUTTON_ICON"]},
+        "ColorMode": {"type": "string", "enum": ["LIGHT", "DARK", "DYNAMIC"]},
+        "Extension": {"type": "string", "enum": ["ICO", "PNG", "SVG"]},
+        "ResourceId": {"type": "string", "minLength": 1, "maxLength": 40, "pattern": "^[\\w\\- ]+$"}
+      },
+      "required": ["Category", "ColorMode", "Extension"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["UserPoolId"],
+  "readOnlyProperties": ["/properties/ManagedLoginBrandingId"],
+  "createOnlyProperties": ["/properties/ClientId", "/properties/UserPoolId"],
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/ManagedLoginBrandingId"],
+  "additionalProperties": false,
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:CreateManagedLoginBranding", "cognito-idp:DescribeManagedLoginBrandingByClient"]},
+    "read": {"permissions": ["cognito-idp:DescribeManagedLoginBranding"]},
+    "update": {"permissions": ["cognito-idp:DescribeManagedLoginBranding", "cognito-idp:UpdateManagedLoginBranding"]},
+    "delete": {"permissions": ["cognito-idp:DeleteManagedLoginBranding"]},
+    "list": {"permissions": ["cognito-idp:ListUserPools", "cognito-idp:ListUserPoolClients", "cognito-idp:DescribeManagedLoginBrandingByClient"]}
+  }
+}

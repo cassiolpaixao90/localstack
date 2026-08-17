@@ -1,0 +1,48 @@
+{
+  "typeName": "AWS::ApiGatewayV2::Api",
+  "description": "Native LocalStack HTTP API subset",
+  "additionalProperties": false,
+  "primaryIdentifier": ["/properties/ApiId"],
+  "readOnlyProperties": ["/properties/ApiEndpoint", "/properties/ApiId"],
+  "createOnlyProperties": ["/properties/ProtocolType"],
+  "properties": {
+    "ApiEndpoint": {"type": "string"},
+    "ApiId": {"type": "string"},
+    "ApiKeySelectionExpression": {"type": "string"},
+    "CorsConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "AllowCredentials": {"type": "boolean"},
+        "AllowHeaders": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "AllowMethods": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "AllowOrigins": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "ExposeHeaders": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "MaxAge": {"type": "integer", "minimum": 0, "maximum": 86400}
+      }
+    },
+    "Description": {"type": "string"},
+    "DisableExecuteApiEndpoint": {"type": "boolean"},
+    "IpAddressType": {"type": "string", "enum": ["ipv4", "dualstack"]},
+    "Name": {"type": "string", "minLength": 1, "maxLength": 128},
+    "ProtocolType": {"type": "string", "enum": ["HTTP"]},
+    "RouteSelectionExpression": {"type": "string"},
+    "Tags": {"type": "object", "maxProperties": 50, "additionalProperties": {"type": "string"}},
+    "Version": {"type": "string"}
+  },
+  "required": ["Name", "ProtocolType"],
+  "handlers": {
+    "create": {"permissions": ["apigateway:POST"]},
+    "read": {"permissions": ["apigateway:GET"]},
+    "list": {"permissions": ["apigateway:GET"]},
+    "update": {"permissions": ["apigateway:PATCH", "apigateway:PUT", "apigateway:DELETE"]},
+    "delete": {"permissions": ["apigateway:DELETE"]}
+  },
+  "tagging": {
+    "taggable": true,
+    "tagOnCreate": true,
+    "tagUpdatable": true,
+    "cloudFormationSystemTags": true,
+    "tagProperty": "/properties/Tags"
+  }
+}

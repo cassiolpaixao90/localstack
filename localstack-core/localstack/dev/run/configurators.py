@@ -67,8 +67,7 @@ class PortConfigurator:
 
 class ImageConfigurator:
     """
-    Sets the container image to use for the container (by default either localstack/localstack or
-    localstack/localstack-pro)
+    Sets the single LocalStack container image.
     """
 
     def __init__(self, pro: bool, image_name: str | None):
@@ -79,10 +78,7 @@ class ImageConfigurator:
         if self.image_name:
             cfg.image_name = self.image_name
         else:
-            if self.pro:
-                cfg.image_name = constants.DOCKER_IMAGE_NAME_PRO
-            else:
-                cfg.image_name = constants.DOCKER_IMAGE_NAME
+            cfg.image_name = constants.DOCKER_IMAGE_NAME
 
 
 class CustomEntryPointConfigurator:

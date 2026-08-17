@@ -30,6 +30,7 @@ https://dill.readthedocs.io/en/latest/index.html?highlight=register#dill.Pickler
 
 import inspect
 from collections.abc import Callable
+from threading import RLock
 from typing import Any, BinaryIO
 
 import dill
@@ -222,6 +223,12 @@ class Pickler(dill.Pickler):
         dispatch.update(Pickler.dispatch_overwrite.copy())  # makes sure ours take precedence
         dispatch.match_subclasses_of.update(Pickler.match_subclasses_of.copy())
         self.dispatch = dispatch
+
+
+@reducer(type(RLock()), RLock)
+def _reduce_rlock(_lock):
+    """Restore process-local synchronization primitives as fresh unlocked locks."""
+    return ()
 
 
 class PickleEncoder(Encoder):

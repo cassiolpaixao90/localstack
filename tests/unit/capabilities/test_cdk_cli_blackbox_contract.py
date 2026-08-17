@@ -62,7 +62,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert workflow[True] == {"push": {"branches": ["main"]}}
     assert workflow["permissions"] == {"contents": "read"}
     assert job["strategy"]["fail-fast"] is False
-    assert job["timeout-minutes"] == 15
+    assert job["timeout-minutes"] == 20
     assert job["strategy"]["matrix"]["include"] == [
         {
             "runner": "ubuntu-24.04",
@@ -83,7 +83,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     step_names = [step["name"] for step in job["steps"]]
     checkout = steps["Checkout"]
     assert checkout["uses"] == "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803"
-    assert checkout["with"]["persist-credentials"] is False
+    assert checkout["with"] == {"fetch-depth": 0, "persist-credentials": False}
     node_setup = steps["Set up pinned Node"]
     assert node_setup["uses"] == "actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38"
     assert node_setup["with"] == {
@@ -91,7 +91,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
         "package-manager-cache": "false",
     }
     isolated_run = steps["Run CDK gate without external egress"]["run"]
-    assert "sudo timeout --signal=TERM --kill-after=10s 420s" in isolated_run
+    assert "sudo timeout --signal=TERM --kill-after=10s 600s" in isolated_run
     assert "unshare --net --pid --fork --kill-child=KILL --mount-proc" in isolated_run
     assert "scripts/run_cdk_cli_blackbox_isolated.sh" in isolated_run
     for github_value in (
@@ -168,6 +168,7 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert "sub(/@.*/" not in isolated_runner
     assert 'readonly interfaces="$' not in isolated_runner
     assert "readonly interfaces" in isolated_runner
+    assert isolated_runner.count(".venv/bin/python -I -S") == 4
     assert steps["Archive lane result"]["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     )
@@ -242,9 +243,43 @@ def test_cdk_python_synth_diagnostic_is_separate_and_closed():
     assert "--scenario synth-python-minimal-sqs-v1" in isolated_runner
     assert "CDK_PYTHON_SYNTH_OBSERVATION=" in isolated_runner
     assert "CDK_PYTHON_SYNTH_OUTPUT=" in isolated_runner
+    assert 'CDK_PYTHON_SYNTH_PYTHON="$synth_venv/bin/python"' in isolated_runner
+    assert 'CDK_PYTHON_SYNTH_TOOLCHAIN_MANIFEST="$synth_manifest"' in isolated_runner
+
+    download = steps["Download content-addressed Python synth wheels"]
+    assert "timeout --signal=TERM --kill-after=5s 120s" in download["run"]
+    assert "python_synth_toolchain.py download" in download["run"]
+    assert "cdk-python-synth-wheelhouse-${{ matrix.arch }}" in download["run"]
+    step_names = [step["name"] for step in job["steps"]]
+    assert (
+        step_names.index("Set up Python")
+        < step_names.index("Download content-addressed Python synth wheels")
+        < step_names.index("Set up pinned Node")
+    )
+    assert (
+        step_names.index("Download content-addressed Python synth wheels")
+        < step_names.index("Install Python test dependencies")
+        < step_names.index("Run CDK gate without external egress")
+    )
+    assert "timeout --signal=TERM --kill-after=5s 180s" in isolated_runner
+    assert isolated_runner.index('python_synth_toolchain.py" install') < isolated_runner.index(
+        '/bin/bash "$sandbox_workspace/scripts/run_cdk_cli_blackbox_isolated.sh" run'
+    )
+    assert "--without-pip" in (PROJECT_ROOT / "tests/aws/cli/python_synth_toolchain.py").read_text()
+    assert 'chown -R 0:0 "$synth_venv"' in isolated_runner
+    assert 'chmod -R o+rX,o-w "$synth_venv"' in isolated_runner
+    assert 'chown 0:0 "$synth_manifest"' in isolated_runner
+    assert 'chmod 0444 "$synth_manifest"' in isolated_runner
+    assert isolated_runner.index('chown -R 0:0 "$synth_venv"') < isolated_runner.index(
+        'mount --bind "$synth_venv" "$synth_venv"'
+    )
+    assert 'mount -o remount,bind,ro,nosuid,nodev "$synth_venv"' in isolated_runner
+    assert 'mount -o remount,bind,ro,nosuid,nodev "$synth_manifest"' in isolated_runner
+    assert "the Python synth toolchain remains writable" in isolated_runner
 
     lane = steps["Build Python synth lane receipt"]["run"]
-    assert "python_synth_execution_evidence.py lane" in lane
+    assert "python3 -I -S tests/aws/cli/python_synth_execution_evidence_v2.py lane" in lane
+    assert "python_synth_execution_evidence.py lane" not in lane
     assert "--assembly-output" in lane
     assert "cdk-python-synth-observation-${{ matrix.arch }}.json" in lane
     assert "cdk-python-synth-execution-receipt-${{ matrix.arch }}.json" in lane
@@ -258,8 +293,8 @@ def test_cdk_python_synth_diagnostic_is_separate_and_closed():
     assert "pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml" in artifact["with"]["path"]
     assert "cdk-python-synth-execution-receipt-${{ matrix.arch }}.json" in artifact["with"]["path"]
 
-    download = aggregate_steps["Download Python synth results"]
-    assert download["with"] == {
+    aggregate_download = aggregate_steps["Download Python synth results"]
+    assert aggregate_download["with"] == {
         "pattern": "test-results-cdk-python-synth-*",
         "path": "target/cdk-python-synth-results",
         "merge-multiple": False,
@@ -267,8 +302,12 @@ def test_cdk_python_synth_diagnostic_is_separate_and_closed():
     required = aggregate_steps["Require the passing Python synth matrix"]["run"]
     assert 'test "${#downloaded[@]}" -eq 4' in required
     assert "--scenario synth-python-minimal-sqs-v1" in required
+    assert "python3 -I -S tests/aws/cli/validate_junit.py" in required
     aggregate = aggregate_steps["Build Python synth candidate evidence"]["run"]
-    assert "python_synth_execution_evidence.py aggregate" in aggregate
+    assert (
+        "python3 -I -S tests/aws/cli/python_synth_execution_evidence_v2.py aggregate" in aggregate
+    )
+    assert "python_synth_execution_evidence.py aggregate" not in aggregate
     assert "--receipt-amd64" in aggregate and "--receipt-arm64" in aggregate
     assert (
         aggregate_steps["Attest Python synth candidate evidence"]["with"]["subject-path"]
@@ -288,6 +327,42 @@ def test_cdk_python_synth_preserves_the_virtualenv_interpreter_path(tmp_path):
     virtualenv_interpreter.symlink_to(interpreter)
 
     assert _python_interpreter_path(str(virtualenv_interpreter)) == virtualenv_interpreter
+
+
+def test_cdk_apigateway_deploy_diagnostic_is_separate_and_closed():
+    workflow = _load_bounded_yaml(WORKFLOW_PATH.read_text())
+    job = workflow["jobs"]["cdk-cli-blackbox"]
+    steps = {step["name"]: step for step in job["steps"]}
+    isolated_runner = ISOLATED_RUNNER_PATH.read_text()
+
+    assert EXPECTED_TESTS["deploy-python-apigateway-mock-v1"] == (
+        "tests.aws.cli.test_cdk_cli_apigateway_deploy",
+        "test_cdk_cli_deploys_invokes_and_cleans_up_enterprise_apigateway",
+    )
+    assert (
+        "tests/aws/cli/test_cdk_cli_apigateway_deploy.py::"
+        "test_cdk_cli_deploys_invokes_and_cleans_up_enterprise_apigateway" in isolated_runner
+    )
+    assert "pytest-junit-cdk-apigateway-$RESULT_ARCH.xml" in isolated_runner
+    assert "--scenario deploy-python-apigateway-mock-v1" in isolated_runner
+    assert 'CDK_PYTHON_SYNTH_PYTHON="$synth_venv/bin/python"' in isolated_runner
+
+    artifact = steps["Archive API Gateway deploy diagnostic"]
+    assert artifact["uses"] == (
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
+    )
+    assert artifact["with"] == {
+        "name": "diagnostic-cdk-apigateway-${{ matrix.arch }}",
+        "path": (
+            "target/cdk-cli-blackbox-${{ matrix.arch }}/"
+            "pytest-junit-cdk-apigateway-${{ matrix.arch }}.xml"
+        ),
+        "if-no-files-found": "error",
+        "retention-days": 30,
+    }
+    assert "test-results-cdk-cli-" not in artifact["with"]["name"]
+    assert "test-results-cdk-bootstrap-upgrade-" not in artifact["with"]["name"]
+    assert "test-results-cdk-python-synth-" not in artifact["with"]["name"]
 
 
 def test_required_cdk_cli_gate_rejects_external_network_interfaces():

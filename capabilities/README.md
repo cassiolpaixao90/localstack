@@ -14,6 +14,7 @@ Verify that committed artifacts are current:
 
 ```bash
 PYTHONPATH=localstack-core python -m localstack.capabilities --check
+PYTHONPATH=localstack-core python -m localstack.capabilities.cdk --project-root . --check
 ```
 
 Artifacts:
@@ -23,11 +24,28 @@ Artifacts:
 - `cdk/compatibility.json`: content-addressed CDK language, toolchain, and
   scenario planning baseline;
 - `cdk/compatibility.schema.json`: closed contract for the CDK baseline;
+- `cdk/services.json`: every pinned AWS CDK service namespace, construct/L1
+  inventory, CloudFormation drift, and static LocalStack resource-provider join;
+- `cdk/services.schema.json`: closed contract for the CDK service map;
 - `report.md`: human-readable summary derived from the JSON inventory.
 
 Do not edit generated files manually. Static analysis never promotes an operation
 to `native` or `parity-pass`; those states require runtime dispatch evidence and
 fresh differential validation against AWS.
+
+The native Cognito IDP foundation currently contributes 18 runtime-unverified
+`partial` candidates to the catalog; 104 of 122 operations remain explicitly
+`missing`. The first native Cognito Identity foundation contributes six
+runtime-unverified `partial` candidates and leaves 17 of 23 operations
+explicitly `missing`; Cognito Sync remains wholly missing. The
+foundation includes password auth, refresh/revoke, distinct ID/access signing
+keys, bounded public JWKS discovery, OAuth app-client configuration, prefix-domain
+control plane, and unpromoted CloudFormation providers for the full pinned
+Cognito L1 surface (sixteen `AWS::Cognito::*` types across the IDP and Identity
+pools). Identity currently includes only pool lifecycle and guest
+`GetId`; it does not issue credentials or integrate STS/IAM. Restart
+persistence has not been proven, and this is not an Amplify, Hosted UI,
+OAuth/OIDC protocol, SRP, MFA, CDK, or service-wide support claim.
 
 Metrics mode now appends request dispatch origins to the local raw CSV. The
 existing Tinybird `tests_raw__v0` uploader does not ingest that new column; a
@@ -77,6 +95,29 @@ claiming that the real CLI works. Future execution evidence must be attached to
 an exact language, Node, CLI, construct-library, Cloud Assembly, bootstrap,
 platform, and scenario tuple; never replace that matrix with a global
 `cdk_supported` boolean.
+
+The CDK service map is pinned to `aws-cdk-lib` 2.241.0 and includes all 300
+top-level AWS/Alexa construct namespaces, including 28 integration, helper, or
+L2-only namespaces without their own L1 resources. It records the exact
+TypeScript/JavaScript, Python, Java, .NET, and Go binding names, 1,557 distinct
+L1 resource types, and all 1,555 entries from this repository's
+`AWS_AVAILABLE_CFN_RESOURCES` catalog, including the `AWS`, `Alexa`, and `AMZN`
+prefixes. The static join resolves 126 L1 types
+to a concrete LocalStack resource-provider implementation (8.09%): generated
+base classes count only when their registration plugin resolves a concrete
+provider class. Eight namespaces are statically complete, 21 partial, and 243
+have no registered provider. These numbers are planning inputs only. Provider
+presence does not prove create/read/update/delete, rollback, transforms,
+integrations, real-CDK execution, or AWS parity, so every namespace deliberately
+carries `support_claim: not-established`.
+
+The API join resolves at least one candidate for 254 construct namespaces. It
+maps each CloudFormation namespace independently and uses a closed, versioned
+alias table for 24 namespace/API naming differences. Eighteen construct
+namespaces with L1s still have no API candidate and remain explicitly unmapped.
+No fuzzy alias is invented, and the map emits factual provider-presence states
+instead of automatically prescribing an implementation architecture for
+transforms or engine-native resource types.
 
 The launcher treats the standard CDK CLI as trusted code and supervises one
 POSIX process group. It bounds retained capture and runtime but is not a
@@ -172,16 +213,32 @@ separate first-attempt candidate chain whose observation is emitted only after
 the assembly oracles pass and whose receipt is created only after pytest and
 temporary-output cleanup complete successfully.
 
-The gate uses the already pinned Python CDK packages and default stack synthesizer to
-synthesize one L1 SQS resource through the real CLI, with no user-authored file
-or Docker assets, lookups, deployment, or external egress. The default
-synthesizer's stack-template asset manifest is closed explicitly. The emitted
-assembly is bounded and structurally validated. A future first-attempt candidate
-must contain matching native amd64/arm64 receipts, a content-addressed aggregate,
-and a separate Sigstore attestation. It remains ineligible for promotion until
-those bytes are reviewed; the Python distributions are not yet installed from
-a content-addressed lock. The manifest cannot record Python or Cloud Assembly
-support from the diagnostic run or merely from the existence of this workflow.
+Run `31307734639` for commit
+`7d2ce5f636f87785262185bce42aa497d88ee50b` is the first complete Python-synth
+candidate. Its native amd64 and arm64 lanes and aggregate passed, and the exact
+content-addressed aggregate and Sigstore bundle are retained under
+`cdk/evidence/runs/31307734639/`. The retained record remains
+`diagnostic-candidate` with `promotion.eligible=false`: it explicitly blocks
+promotion because the Python distributions were version-pinned but not
+installed from a content-addressed source. Retention and signature verification
+do not override that signed blocker or add Python to the compatibility manifest.
+
+This workflow revision downloads the exact 14-wheel Python application
+closure and a pinned pip installer from immutable PyPI artifact URLs, validating
+the recorded size, SHA-256, wheel tags, metadata, and exact inventory before the
+network boundary closes. Inside the loopback-only namespace, a non-root
+installer creates a dedicated venv without pip, uses the pinned pip resolver
+offline to prove that the four exact roots reach exactly the 14-wheel closure,
+and installs that closure exclusively from the read-only wheelhouse with
+`--no-index`, `--require-hashes`, and `--only-binary=:all:`. The resulting venv
+and its closed toolchain manifest are transferred to root ownership,
+bind-mounted read-only, and revalidated against the executed interpreter before
+the real synth. Evidence schema v2 binds that lock, wheel inventory, installer,
+installed metadata, and installed `site-packages` tree digest while keeping the
+candidate ineligible until a new first-attempt
+two-architecture aggregate and Sigstore bundle are produced and reviewed. The
+retained v1 candidate and the compatibility manifest remain unchanged by this
+implementation slice.
 
 Ingestion is allowed only after offline bundle verification pins every signer
 boundary used by this record:
@@ -200,6 +257,14 @@ gh attestation verify capabilities/cdk/evidence/runs/31305122966/cdk-bootstrap-u
   --repo cassiolpaixao90/localstack \
   --signer-workflow cassiolpaixao90/localstack/.github/workflows/cdk-cli-blackbox.yml \
   --source-digest c4a933343b6be315208edd68bb4827650275fcc6 \
+  --source-ref refs/heads/main \
+  --deny-self-hosted-runners
+
+gh attestation verify capabilities/cdk/evidence/runs/31307734639/cdk-python-synth-execution-evidence.json \
+  --bundle capabilities/cdk/evidence/runs/31307734639/cdk-python-synth-execution-evidence.sigstore.json \
+  --repo cassiolpaixao90/localstack \
+  --signer-workflow cassiolpaixao90/localstack/.github/workflows/cdk-cli-blackbox.yml \
+  --source-digest 7d2ce5f636f87785262185bce42aa497d88ee50b \
   --source-ref refs/heads/main \
   --deny-self-hosted-runners
 ```

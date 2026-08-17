@@ -1,0 +1,42 @@
+{
+  "typeName": "AWS::Cognito::UserPoolUserToGroupAttachment",
+  "description": "A native Cognito user-to-group membership.",
+  "additionalProperties": false,
+  "properties": {
+    "GroupName": {"type": "string", "minLength": 1, "maxLength": 128},
+    "Id": {"type": "string", "pattern": "^UserToGroupAttachment-[0-9a-f]{16}$"},
+    "Username": {"type": "string", "minLength": 1, "maxLength": 128},
+    "UserPoolId": {
+      "type": "string",
+      "pattern": "^[\\w-]+_[0-9a-zA-Z]+$",
+      "minLength": 1,
+      "maxLength": 55
+    }
+  },
+  "primaryIdentifier": [
+    "/properties/UserPoolId",
+    "/properties/Username",
+    "/properties/GroupName"
+  ],
+  "required": ["GroupName", "Username", "UserPoolId"],
+  "readOnlyProperties": ["/properties/Id"],
+  "createOnlyProperties": [
+    "/properties/GroupName",
+    "/properties/Username",
+    "/properties/UserPoolId"
+  ],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:AdminAddUserToGroup"]},
+    "read": {"permissions": ["cognito-idp:AdminListGroupsForUser"]},
+    "update": {"permissions": ["cognito-idp:AdminListGroupsForUser"]},
+    "delete": {"permissions": ["cognito-idp:AdminRemoveUserFromGroup"]},
+    "list": {
+      "permissions": [
+        "cognito-idp:AdminListGroupsForUser",
+        "cognito-idp:ListUsers",
+        "cognito-idp:ListUsersInGroup"
+      ]
+    }
+  }
+}

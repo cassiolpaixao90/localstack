@@ -1,0 +1,55 @@
+{
+  "typeName": "AWS::Cognito::UserPoolResourceServer",
+  "description": "A native Cognito OAuth resource server and its custom scopes.",
+  "additionalProperties": false,
+  "properties": {
+    "Identifier": {
+      "type": "string",
+      "pattern": "^[\\x21\\x23-\\x5B\\x5D-\\x7E]+$",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "Name": {
+      "type": "string",
+      "pattern": "^[\\w\\s+=,.@-]+$",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "Scopes": {
+      "type": "array",
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ScopeDescription": {"type": "string", "minLength": 1, "maxLength": 256},
+          "ScopeName": {
+            "type": "string",
+            "pattern": "^[\\x21\\x23-\\x2E\\x30-\\x5B\\x5D-\\x7E]+$",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["ScopeDescription", "ScopeName"]
+      }
+    },
+    "UserPoolId": {
+      "type": "string",
+      "pattern": "^[\\w-]+_[0-9a-zA-Z]+$",
+      "minLength": 1,
+      "maxLength": 55
+    }
+  },
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/Identifier"],
+  "required": ["Identifier", "Name", "UserPoolId"],
+  "createOnlyProperties": ["/properties/Identifier", "/properties/UserPoolId"],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:CreateResourceServer"]},
+    "read": {"permissions": ["cognito-idp:DescribeResourceServer"]},
+    "update": {"permissions": ["cognito-idp:UpdateResourceServer"]},
+    "delete": {"permissions": ["cognito-idp:DeleteResourceServer"]},
+    "list": {"permissions": ["cognito-idp:ListResourceServers"]}
+  }
+}

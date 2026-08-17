@@ -1,0 +1,23 @@
+{
+  "typeName": "AWS::ApiGatewayV2::ApiMapping",
+  "description": "Native LocalStack HTTP API custom domain mapping subset",
+  "additionalProperties": false,
+  "primaryIdentifier": ["/properties/DomainName", "/properties/ApiMappingId"],
+  "readOnlyProperties": ["/properties/ApiMappingId"],
+  "createOnlyProperties": ["/properties/DomainName"],
+  "properties": {
+    "ApiId": {"type": "string", "minLength": 1},
+    "ApiMappingId": {"type": "string"},
+    "ApiMappingKey": {"type": "string", "maxLength": 300},
+    "DomainName": {"type": "string", "minLength": 3, "maxLength": 253},
+    "Stage": {"type": "string", "minLength": 1, "maxLength": 128}
+  },
+  "required": ["ApiId", "DomainName", "Stage"],
+  "handlers": {
+    "create": {"permissions": ["apigateway:POST"]},
+    "read": {"permissions": ["apigateway:GET"]},
+    "list": {"permissions": ["apigateway:GET"]},
+    "update": {"permissions": ["apigateway:PATCH"]},
+    "delete": {"permissions": ["apigateway:DELETE"]}
+  }
+}

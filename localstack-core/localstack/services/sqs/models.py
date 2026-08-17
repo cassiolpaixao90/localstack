@@ -647,7 +647,22 @@ class SqsQueue:
             )
 
     def validate_queue_attributes(self, attributes):
-        pass
+        self._validate_receive_message_wait_time(attributes)
+
+    @staticmethod
+    def _validate_receive_message_wait_time(attributes: QueueAttributeMap) -> None:
+        value = attributes.get(QueueAttributeName.ReceiveMessageWaitTimeSeconds)
+        if value is None:
+            return
+        try:
+            seconds = int(value)
+        except (TypeError, ValueError):
+            seconds = -1
+        if seconds < 0 or seconds > 20:
+            raise InvalidAttributeValue(
+                "Invalid value for the parameter ReceiveMessageWaitTimeSeconds. "
+                "Reason: must be between 0 and 20."
+            )
 
     def add_permission(self, label: str, actions: list[str], account_ids: list[str]) -> None:
         """
@@ -956,6 +971,7 @@ class StandardQueue(SqsQueue):
                 pass
 
     def validate_queue_attributes(self, attributes):
+        super().validate_queue_attributes(attributes)
         valid = [
             k[1]
             for k in inspect.getmembers(
@@ -1355,6 +1371,7 @@ class FifoQueue(SqsQueue):
         super()._assert_queue_name(queue_name)
 
     def validate_queue_attributes(self, attributes):
+        super().validate_queue_attributes(attributes)
         valid = [
             k[1]
             for k in inspect.getmembers(QueueAttributeName)

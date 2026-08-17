@@ -1,6 +1,7 @@
 # LocalStack Resource Provider Scaffolding v2
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from typing import TypedDict
@@ -24,6 +25,28 @@ class SNSTopicPolicyProperties(TypedDict):
 
 
 REPEATED_INVOCATION = "repeated_invocation"
+
+
+def _serialize_policy(policy: dict | str) -> str:
+    if isinstance(policy, str):
+        return policy
+    return json.dumps(policy)
+
+
+def _is_not_found(error: ClientError) -> bool:
+    return "NotFound" in error.response.get("Error", {}).get("Code", "")
+
+
+def _restore_default_policy(sns_client, topic_arn: str) -> None:
+    try:
+        sns_client.set_topic_attributes(
+            TopicArn=topic_arn,
+            AttributeName="Policy",
+            AttributeValue=create_default_topic_policy(topic_arn),
+        )
+    except ClientError as error:
+        if not _is_not_found(error):
+            raise
 
 
 class SNSTopicPolicyProvider(ResourceProvider[SNSTopicPolicyProperties]):
@@ -51,10 +74,10 @@ class SNSTopicPolicyProvider(ResourceProvider[SNSTopicPolicyProperties]):
           - sns:SetTopicAttributes
 
         """
-        model = request.desired_state
+        model = copy.deepcopy(request.desired_state)
         sns_client = request.aws_client_factory.sns
 
-        policy = json.dumps(model["PolicyDocument"])
+        policy = _serialize_policy(model["PolicyDocument"])
         for topic_arn in model["Topics"]:
             sns_client.set_topic_attributes(
                 TopicArn=topic_arn, AttributeName="Policy", AttributeValue=policy
@@ -91,24 +114,15 @@ class SNSTopicPolicyProvider(ResourceProvider[SNSTopicPolicyProperties]):
         IAM permissions required:
           - sns:SetTopicAttributes
         """
-        model = request.desired_state
+        model = request.previous_state
         sns = request.aws_client_factory.sns
 
         for topic_arn in model["Topics"]:
-            try:
-                sns.set_topic_attributes(
-                    TopicArn=topic_arn,
-                    AttributeName="Policy",
-                    AttributeValue=create_default_topic_policy(topic_arn),
-                )
-
-            except ClientError as err:
-                if "NotFound" not in err.response["Error"]["Code"]:
-                    raise
+            _restore_default_policy(sns, topic_arn)
 
         return ProgressEvent(
             status=OperationStatus.SUCCESS,
-            resource_model=model,
+            resource_model={},
             custom_context=request.custom_context,
         )
 
@@ -122,4 +136,26 @@ class SNSTopicPolicyProvider(ResourceProvider[SNSTopicPolicyProperties]):
         IAM permissions required:
           - sns:SetTopicAttributes
         """
-        raise NotImplementedError
+        model = copy.deepcopy(request.desired_state)
+        previous_model = request.previous_state
+        sns = request.aws_client_factory.sns
+
+        policy = _serialize_policy(model["PolicyDocument"])
+        for topic_arn in model["Topics"]:
+            sns.set_topic_attributes(
+                TopicArn=topic_arn,
+                AttributeName="Policy",
+                AttributeValue=policy,
+            )
+
+        desired_topics = set(model["Topics"])
+        for topic_arn in previous_model.get("Topics", []):
+            if topic_arn not in desired_topics:
+                _restore_default_policy(sns, topic_arn)
+
+        model["Id"] = previous_model["Id"]
+        return ProgressEvent(
+            status=OperationStatus.SUCCESS,
+            resource_model=model,
+            custom_context=request.custom_context,
+        )

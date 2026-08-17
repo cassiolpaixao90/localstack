@@ -129,6 +129,7 @@ class Stack:
         resource_type: str,
         status: ResourceStatus,
         resource_status_reason: str | None = None,
+        update_resource_state: bool = True,
     ):
         resource_description = StackResource(
             StackName=self.stack_name,
@@ -144,10 +145,11 @@ class Stack:
         if not resource_status_reason:
             resource_description.pop("ResourceStatusReason")
 
-        if status == ResourceStatus.DELETE_COMPLETE:
-            self.resource_states.pop(logical_resource_id)
-        else:
-            self.resource_states[logical_resource_id] = resource_description
+        if update_resource_state:
+            if status == ResourceStatus.DELETE_COMPLETE:
+                self.resource_states.pop(logical_resource_id)
+            else:
+                self.resource_states[logical_resource_id] = resource_description
 
         self._store_event(
             resource_id=logical_resource_id,

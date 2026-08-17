@@ -286,7 +286,7 @@ def generate_k8s_helm_overrides(
             },
         ]
 
-    image_repository = "localstack/localstack-pro" if pro else "localstack/localstack"
+    image_repository = "localstack/localstack"
 
     service = {
         "edgeService": {

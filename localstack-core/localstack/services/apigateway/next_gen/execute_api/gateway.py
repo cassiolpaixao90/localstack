@@ -24,6 +24,7 @@ class RestApiGateway(Gateway):
                 handlers.modify_request,
                 handlers.route_request,
                 handlers.preprocess_request,
+                handlers.cognito_user_pools_authorizer_handler,
                 handlers.api_key_validation_handler,
                 handlers.method_request_handler,
                 handlers.integration_request_handler,

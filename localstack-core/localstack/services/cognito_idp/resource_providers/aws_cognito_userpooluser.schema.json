@@ -1,0 +1,74 @@
+{
+  "typeName": "AWS::Cognito::UserPoolUser",
+  "description": "A native Cognito user-pool user.",
+  "additionalProperties": false,
+  "properties": {
+    "ClientMetadata": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "DesiredDeliveryMediums": {
+      "type": "array",
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {"type": "string", "enum": ["EMAIL", "SMS"]}
+    },
+    "ForceAliasCreation": {"type": "boolean"},
+    "MessageAction": {"type": "string", "enum": ["RESEND", "SUPPRESS"]},
+    "UserAttributes": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {"$ref": "#/definitions/AttributeType"}
+    },
+    "Username": {"type": "string", "minLength": 1, "maxLength": 128},
+    "UserPoolId": {
+      "type": "string",
+      "pattern": "^[\\w-]+_[0-9a-zA-Z]+$",
+      "minLength": 1,
+      "maxLength": 55
+    },
+    "ValidationData": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {"$ref": "#/definitions/AttributeType"}
+    }
+  },
+  "definitions": {
+    "AttributeType": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Name": {"type": "string", "minLength": 1, "maxLength": 32},
+        "Value": {"type": "string", "maxLength": 2048}
+      },
+      "required": ["Name", "Value"]
+    }
+  },
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/Username"],
+  "required": ["UserPoolId"],
+  "createOnlyProperties": [
+    "/properties/ClientMetadata",
+    "/properties/DesiredDeliveryMediums",
+    "/properties/ForceAliasCreation",
+    "/properties/MessageAction",
+    "/properties/UserAttributes",
+    "/properties/Username",
+    "/properties/UserPoolId",
+    "/properties/ValidationData"
+  ],
+  "writeOnlyProperties": [
+    "/properties/ClientMetadata",
+    "/properties/DesiredDeliveryMediums",
+    "/properties/ForceAliasCreation",
+    "/properties/MessageAction",
+    "/properties/ValidationData"
+  ],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:AdminCreateUser"]},
+    "read": {"permissions": ["cognito-idp:AdminGetUser"]},
+    "update": {"permissions": ["cognito-idp:AdminGetUser"]},
+    "delete": {"permissions": ["cognito-idp:AdminDeleteUser"]},
+    "list": {"permissions": ["cognito-idp:ListUsers"]}
+  }
+}

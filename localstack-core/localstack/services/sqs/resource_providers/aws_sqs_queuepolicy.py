@@ -60,7 +60,7 @@ class SQSQueuePolicyProvider(SQSQueuePolicyProviderBase):
                 sqs.set_queue_attributes(QueueUrl=queue, Attributes={"Policy": ""})
 
             except sqs.exceptions.QueueDoesNotExist:
-                return ProgressEvent(status=OperationStatus.FAILED, resource_model={})
+                continue
 
         return ProgressEvent(
             status=OperationStatus.SUCCESS,
@@ -87,7 +87,10 @@ class SQSQueuePolicyProvider(SQSQueuePolicyProviderBase):
         previous_queues = request.previous_state.get("Queues", [])
         outdated_queues = set(previous_queues) - set(desired_queues)
         for queue in outdated_queues:
-            sqs.set_queue_attributes(QueueUrl=queue, Attributes={"Policy": ""})
+            try:
+                sqs.set_queue_attributes(QueueUrl=queue, Attributes={"Policy": ""})
+            except sqs.exceptions.QueueDoesNotExist:
+                continue
 
         model["Id"] = request.previous_state["Id"]
 

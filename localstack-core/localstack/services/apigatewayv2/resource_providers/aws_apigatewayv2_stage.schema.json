@@ -1,0 +1,55 @@
+{
+  "typeName": "AWS::ApiGatewayV2::Stage",
+  "description": "Native LocalStack HTTP API stage subset",
+  "additionalProperties": false,
+  "primaryIdentifier": ["/properties/ApiId", "/properties/StageName"],
+  "readOnlyProperties": ["/properties/ApiGatewayManaged", "/properties/CreatedDate", "/properties/LastUpdatedDate"],
+  "createOnlyProperties": ["/properties/ApiId", "/properties/StageName"],
+  "properties": {
+    "AccessLogSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "DestinationArn": {"type": "string"},
+        "Format": {"type": "string"}
+      },
+      "required": ["DestinationArn", "Format"]
+    },
+    "ApiGatewayManaged": {"type": "boolean"},
+    "ApiId": {"type": "string"},
+    "AutoDeploy": {"type": "boolean"},
+    "CreatedDate": {"type": "string"},
+    "DefaultRouteSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "DataTraceEnabled": {"type": "boolean"},
+        "DetailedMetricsEnabled": {"type": "boolean"},
+        "LoggingLevel": {"type": "string", "enum": ["ERROR", "INFO", "OFF"]},
+        "ThrottlingBurstLimit": {"type": "integer", "minimum": 1, "maximum": 5000},
+        "ThrottlingRateLimit": {"type": "number", "exclusiveMinimum": 0, "maximum": 10000}
+      }
+    },
+    "DeploymentId": {"type": "string"},
+    "Description": {"type": "string"},
+    "LastUpdatedDate": {"type": "string"},
+    "StageName": {"type": "string", "minLength": 1},
+    "StageVariables": {"type": "object", "additionalProperties": {"type": "string"}},
+    "Tags": {"type": "object", "maxProperties": 50, "additionalProperties": {"type": "string"}}
+  },
+  "required": ["ApiId", "StageName"],
+  "handlers": {
+    "create": {"permissions": ["apigateway:POST"]},
+    "read": {"permissions": ["apigateway:GET"]},
+    "list": {"permissions": ["apigateway:GET"]},
+    "update": {"permissions": ["apigateway:PATCH", "apigateway:PUT", "apigateway:DELETE"]},
+    "delete": {"permissions": ["apigateway:DELETE"]}
+  },
+  "tagging": {
+    "taggable": true,
+    "tagOnCreate": true,
+    "tagUpdatable": true,
+    "cloudFormationSystemTags": true,
+    "tagProperty": "/properties/Tags"
+  }
+}

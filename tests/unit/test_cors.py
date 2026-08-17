@@ -1,8 +1,10 @@
 from werkzeug.datastructures import Headers
 
 from localstack import config
+from localstack.aws.api import RequestContext
 from localstack.aws.handlers import cors
 from localstack.config import HostAndPort
+from localstack.http import Request
 
 # The default host depends on whether running in Docker (see config.py::default_ip) but that's good enough for testing:
 default_gateway_listen = [HostAndPort(host="0.0.0.0", port=4566)]
@@ -80,6 +82,67 @@ def test_dynamic_allowed_cors_origins_different_domains(monkeypatch):
 
     assert not _origin_allowed("http://test.s3-website.my-wrong-domain.com")
     assert not _origin_allowed("http://test.s3-website.my-wrong-domain.com:4566")
+
+
+def test_only_exact_cognito_oauth_hosts_and_paths_are_self_managed():
+    def is_self_managed(path, host, method="POST"):
+        context = RequestContext(
+            Request(
+                method, path, headers={"Origin": "https://evil.example.test"}, server=(host, 4566)
+            )
+        )
+        return not cors.should_enforce_self_managed_service(context)
+
+    host = "login.localhost.localstack.cloud"
+    assert is_self_managed("/login", host, "GET")
+    assert is_self_managed("/login", host, "POST")
+    assert is_self_managed("/oauth2/authorize", host, "GET")
+    assert is_self_managed("/oauth2/idpresponse", host, "GET")
+    assert is_self_managed("/oauth2/idpresponse", host, "POST")
+    assert is_self_managed("/saml2/idpresponse", host, "POST")
+    assert is_self_managed("/oauth2/token", host, "POST")
+    assert is_self_managed("/oauth2/token", host, "OPTIONS")
+    assert is_self_managed("/oauth2/revoke", host, "POST")
+    assert is_self_managed("/oauth2/revoke", host, "OPTIONS")
+    assert is_self_managed("/oauth2/userInfo", host, "GET")
+    assert is_self_managed("/oauth2/userInfo", host, "POST")
+    assert is_self_managed("/oauth2/userInfo", host, "OPTIONS")
+    assert is_self_managed("/logout", host, "GET")
+
+    assert not is_self_managed("/oauth2/authorize", host, "POST")
+    assert not is_self_managed("/oauth2/idpresponse", host, "DELETE")
+    assert not is_self_managed("/saml2/idpresponse", host, "GET")
+    assert not is_self_managed("/saml2/idpresponse/extra", host, "POST")
+    assert not is_self_managed("/login", host, "DELETE")
+    assert not is_self_managed("/oauth2/token", host, "GET")
+    assert not is_self_managed("/oauth2/token/extra", host)
+    assert not is_self_managed("/oauth2/revoke", host, "GET")
+    assert not is_self_managed("/oauth2/userInfo", host, "DELETE")
+    assert not is_self_managed("/logout", host, "POST")
+    assert not is_self_managed("/oauth2/token", "login.evil.example.test")
+    assert not is_self_managed("/saml2/idpresponse", "login.localhost.localstack.cloud.evil.test")
+    assert not is_self_managed("/oauth2/token", "localhost.localstack.cloud")
+
+
+def test_only_exact_public_cognito_oidc_get_paths_are_self_managed():
+    def is_self_managed(path, method="GET"):
+        context = RequestContext(
+            Request(
+                method,
+                path,
+                headers={"Origin": "https://browser.example.test"},
+                server=("localhost.localstack.cloud", 4566),
+            )
+        )
+        return not cors.should_enforce_self_managed_service(context)
+
+    pool_id = "us-east-1_AbCdEf123"
+    assert is_self_managed(f"/{pool_id}/.well-known/jwks.json")
+    assert is_self_managed(f"/{pool_id}/.well-known/openid-configuration")
+
+    assert not is_self_managed(f"/{pool_id}/.well-known/jwks.json", "POST")
+    assert not is_self_managed(f"/{pool_id}/.well-known/openid-configuration/extra")
+    assert not is_self_managed("/invalid/.well-known/jwks.json")
 
 
 def _origin_allowed(url) -> bool:

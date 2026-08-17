@@ -38,6 +38,7 @@ from localstack.services.cloudformation.resource_provider import (
     ResourceProviderExecutor,
     ResourceProviderPayload,
     get_resource_type,
+    stack_tags_to_map,
 )
 from localstack.services.cloudformation.service_models import (
     DependencyNotYetSatisfied,
@@ -1401,7 +1402,7 @@ class TemplateDeployer:
                 "providerCredentials": creds,
                 "systemTags": {},
                 "previousSystemTags": {},
-                "stackTags": {},
+                "stackTags": stack_tags_to_map(self.stack.tags),
                 "previousStackTags": {},
             },
         }

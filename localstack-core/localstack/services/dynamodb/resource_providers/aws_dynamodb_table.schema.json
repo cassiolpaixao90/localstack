@@ -468,7 +468,9 @@
       "permissions": [
         "dynamodb:DescribeTable",
         "dynamodb:DescribeContinuousBackups",
-        "dynamodb:DescribeContributorInsights"
+        "dynamodb:DescribeTimeToLive",
+        "dynamodb:DescribeKinesisStreamingDestination",
+        "dynamodb:ListTagsOfResource"
       ]
     },
     "update": {

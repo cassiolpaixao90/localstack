@@ -77,3 +77,6 @@ gen/
 
 # setuptools_scm version.py
 */*/version.py
+
+# CDK synth output (build artifact)
+/cdk.out/

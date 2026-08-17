@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://localstack.cloud/schemas/cdk-services:v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "map_sha256",
+    "claim",
+    "methodology",
+    "sources",
+    "summary",
+    "drift",
+    "services"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "map_sha256": {"$ref": "#/$defs/sha256"},
+    "claim": {"const": "static-inventory-only"},
+    "methodology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["denominator", "local_numerator", "handler_classification", "warning"],
+      "properties": {
+        "denominator": {"const": "pinned-aws-cdk-lib-jsii-cloudformation-resources"},
+        "local_numerator": {"const": "statically-discovered-localstack-cloudformation-resource-providers"},
+        "handler_classification": {"const": "static-direct-method-body-presence-only"},
+        "warning": {"const": "resource-provider presence does not establish lifecycle correctness or CDK support"}
+      }
+    },
+    "sources": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aws_cdk_lib", "current_cloudformation_catalog", "localstack_capability_catalog"],
+      "properties": {
+        "aws_cdk_lib": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["distribution", "version", "distribution_wheel_sha256", "jsii_archive_sha256", "jsii_compressed_sha256", "jsii_assembly_sha256"],
+          "properties": {
+            "distribution": {"const": "aws-cdk-lib"},
+            "version": {"const": "2.241.0"},
+            "distribution_wheel_sha256": {"const": "sha256:5c62f97c13a2a9e65b1d2b376f267595b7b2cc3947f6bcf710e52e39a381b5e3"},
+            "jsii_archive_sha256": {"const": "sha256:673416ff7c3ec084b59e805f90fb3c51df3bfe2d51b8d040e6ebabfe3c4c368f"},
+            "jsii_compressed_sha256": {"const": "sha256:5dee15e5c477299081bdddcff1664e7eb7d44b022a0590e7d85a15960240c88c"},
+            "jsii_assembly_sha256": {"const": "sha256:0f317165321aeeb159cb74494569f2e38186cbea46fcdbb6ce38df964a2183b2"}
+          }
+        },
+        "current_cloudformation_catalog": {"$ref": "#/$defs/fileSource"},
+        "localstack_capability_catalog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "inventory_sha256", "botocore_version"],
+          "properties": {
+            "path": {"const": "capabilities/generated/capabilities.json"},
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "inventory_sha256": {"$ref": "#/$defs/sha256"},
+            "botocore_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"}
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cdk_service_modules",
+        "modules_with_construct_classes",
+        "modules_with_l1_resources",
+        "cdk_l1_resource_types",
+        "current_cfn_catalog_resource_types",
+        "cdk_current_cfn_overlap",
+        "cdk_only_resource_types",
+        "current_cfn_only_resource_types",
+        "localstack_resource_provider_types",
+        "localstack_aws_resource_provider_types",
+        "localstack_cdk_l1_intersection",
+        "static_l1_coverage_basis_points",
+        "modules_static_complete",
+        "modules_static_partial",
+        "modules_static_none",
+        "modules_without_l1_resources",
+        "modules_with_api_catalog_candidates",
+        "modules_l1_without_api_catalog_candidate",
+        "modules_l1_with_unmapped_cfn_namespaces",
+        "resource_provider_schema_declared_handlers",
+        "resource_provider_handlers_method_body_present_unverified",
+        "resource_provider_handlers_notimplemented_only",
+        "resource_provider_handlers_contains_notimplemented",
+        "resource_provider_handlers_method_missing",
+        "resource_provider_records_all_method_bodies_present_unverified",
+        "resource_provider_records_incomplete_static_handler_surface",
+        "resource_provider_records_no_schema_handler_declarations"
+      ],
+      "properties": {
+        "cdk_service_modules": {"$ref": "#/$defs/nonnegative"},
+        "modules_with_construct_classes": {"$ref": "#/$defs/nonnegative"},
+        "modules_with_l1_resources": {"$ref": "#/$defs/nonnegative"},
+        "cdk_l1_resource_types": {"$ref": "#/$defs/nonnegative"},
+        "current_cfn_catalog_resource_types": {"$ref": "#/$defs/nonnegative"},
+        "cdk_current_cfn_overlap": {"$ref": "#/$defs/nonnegative"},
+        "cdk_only_resource_types": {"$ref": "#/$defs/nonnegative"},
+        "current_cfn_only_resource_types": {"$ref": "#/$defs/nonnegative"},
+        "localstack_resource_provider_types": {"$ref": "#/$defs/nonnegative"},
+        "localstack_aws_resource_provider_types": {"$ref": "#/$defs/nonnegative"},
+        "localstack_cdk_l1_intersection": {"$ref": "#/$defs/nonnegative"},
+        "static_l1_coverage_basis_points": {"type": "integer", "minimum": 0, "maximum": 10000},
+        "modules_static_complete": {"$ref": "#/$defs/nonnegative"},
+        "modules_static_partial": {"$ref": "#/$defs/nonnegative"},
+        "modules_static_none": {"$ref": "#/$defs/nonnegative"},
+        "modules_without_l1_resources": {"$ref": "#/$defs/nonnegative"},
+        "modules_with_api_catalog_candidates": {"$ref": "#/$defs/nonnegative"},
+        "modules_l1_without_api_catalog_candidate": {"$ref": "#/$defs/nonnegative"},
+        "modules_l1_with_unmapped_cfn_namespaces": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_schema_declared_handlers": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_handlers_method_body_present_unverified": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_handlers_notimplemented_only": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_handlers_contains_notimplemented": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_handlers_method_missing": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_records_all_method_bodies_present_unverified": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_records_incomplete_static_handler_surface": {"$ref": "#/$defs/nonnegative"},
+        "resource_provider_records_no_schema_handler_declarations": {"$ref": "#/$defs/nonnegative"}
+      }
+    },
+    "drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cdk_only_resource_types", "current_cfn_only_resource_types"],
+      "properties": {
+        "cdk_only_resource_types": {"$ref": "#/$defs/resourceTypes"},
+        "current_cfn_only_resource_types": {"$ref": "#/$defs/resourceTypes"}
+      }
+    },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": {"$ref": "#/$defs/service"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "nonnegative": {"type": "integer", "minimum": 0},
+    "fileSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"const": "localstack-core/localstack/services/cloudformation/resources.py"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "resourceTypes": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 2048,
+      "items": {"type": "string", "pattern": "^(AWS|Alexa|AMZN)::[A-Za-z0-9]+::[A-Za-z0-9]+$"}
+    },
+    "operationStatusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["native", "parity-pass", "partial", "fallback", "scaffold", "missing"],
+      "properties": {
+        "native": {"$ref": "#/$defs/nonnegative"},
+        "parity-pass": {"$ref": "#/$defs/nonnegative"},
+        "partial": {"$ref": "#/$defs/nonnegative"},
+        "fallback": {"$ref": "#/$defs/nonnegative"},
+        "scaffold": {"$ref": "#/$defs/nonnegative"},
+        "missing": {"$ref": "#/$defs/nonnegative"}
+      }
+    },
+    "apiCatalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service", "provider_registered", "operation_status_counts"],
+      "properties": {
+        "service": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "provider_registered": {"type": "boolean"},
+        "operation_status_counts": {"$ref": "#/$defs/operationStatusCounts"}
+      }
+    },
+    "apiNamespaceMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "normalized_name", "api_candidates"],
+      "properties": {
+        "namespace": {"type": "string", "pattern": "^[A-Za-z0-9]+$"},
+        "normalized_name": {"type": "string", "pattern": "^[a-z0-9]+$"},
+        "api_candidates": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z0-9-]+$"}
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "bindings",
+        "class_count",
+        "construct_class_count",
+        "stable_construct_class_count",
+        "l1_class_count",
+        "resources",
+        "l1_resource_types",
+        "cloudformation_namespaces",
+        "api_namespace_mappings",
+        "unmapped_cloudformation_namespaces",
+        "localstack_resource_provider_types",
+        "missing_resource_provider_types",
+        "localstack_resource_provider_services",
+        "api_mapping_status",
+        "api_catalog",
+        "static_resource_provider_status",
+        "planning_status",
+        "support_claim"
+      ],
+      "properties": {
+        "module": {"type": "string", "pattern": "^(aws|alexa)_[a-z0-9_]+$"},
+        "bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["typescript_javascript", "python", "java", "dotnet", "go"],
+          "properties": {
+            "typescript_javascript": {"type": "string", "pattern": "^aws-cdk-lib/[a-z0-9-]+$"},
+            "python": {"type": "string", "pattern": "^aws_cdk\\.[a-z0-9_]+$"},
+            "java": {"type": "string", "pattern": "^software\\.amazon\\.awscdk\\.[a-z0-9._]+$"},
+            "dotnet": {"type": "string", "pattern": "^Amazon\\.CDK\\.[A-Za-z0-9._]+$"},
+            "go": {"type": "string", "pattern": "^github\\.com/aws/aws-cdk-go/awscdk/v2/[a-z0-9]+$"}
+          }
+        },
+        "class_count": {"$ref": "#/$defs/nonnegative"},
+        "construct_class_count": {"$ref": "#/$defs/nonnegative"},
+        "stable_construct_class_count": {"$ref": "#/$defs/nonnegative"},
+        "l1_class_count": {"$ref": "#/$defs/nonnegative"},
+        "resources": {
+          "type": "array",
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/resource"}
+        },
+        "l1_resource_types": {"$ref": "#/$defs/resourceTypes"},
+        "cloudformation_namespaces": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9]+$"}
+        },
+        "api_namespace_mappings": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/apiNamespaceMapping"}
+        },
+        "unmapped_cloudformation_namespaces": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Za-z0-9]+$"}
+        },
+        "localstack_resource_provider_types": {"$ref": "#/$defs/resourceTypes"},
+        "missing_resource_provider_types": {"$ref": "#/$defs/resourceTypes"},
+        "localstack_resource_provider_services": {
+          "type": "array",
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[a-z0-9-]+$"}
+        },
+        "api_mapping_status": {"enum": ["mapped", "partial", "unmapped", "not-applicable"]},
+        "api_catalog": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/apiCatalog"}},
+        "static_resource_provider_status": {"enum": ["complete", "partial", "none", "not-applicable"]},
+        "planning_status": {
+          "enum": [
+            "all-resource-provider-records-present",
+            "partial-resource-provider-records",
+            "no-resource-provider-records",
+            "no-l1-resource-types"
+          ]
+        },
+        "support_claim": {"const": "not-established"}
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "class_fqns", "present_in_current_cfn_catalog", "localstack_resource_provider"],
+      "properties": {
+        "type": {"type": "string", "pattern": "^(AWS|Alexa|AMZN)::[A-Za-z0-9]+::[A-Za-z0-9]+$"},
+        "class_fqns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^aws-cdk-lib\\.(aws|alexa)_[A-Za-z0-9_.]+$"}
+        },
+        "present_in_current_cfn_catalog": {"type": "boolean"},
+        "localstack_resource_provider": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["source_service", "catalog_source", "catalog_sha256", "implementation_source", "implementation_class", "implementation_sha256", "registration_source", "registration_sha256", "handler_contract"],
+              "properties": {
+                "source_service": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+                "catalog_source": {"type": "string", "pattern": "^localstack-core/localstack/services/.+\\.py$"},
+                "catalog_sha256": {"$ref": "#/$defs/sha256"},
+                "implementation_source": {"type": "string", "pattern": "^localstack-core/localstack/services/.+\\.py$"},
+                "implementation_class": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$"},
+                "implementation_sha256": {"$ref": "#/$defs/sha256"},
+                "registration_source": {"type": "string", "pattern": "^localstack-core/localstack/services/.+_plugin\\.py$"},
+                "registration_sha256": {"$ref": "#/$defs/sha256"},
+                "handler_contract": {"$ref": "#/$defs/handlerContract"}
+              }
+            }
+          ]
+        }
+      }
+    },
+    "handlerName": {"enum": ["create", "read", "update", "delete", "list"]},
+    "handlerNames": {
+      "type": "array",
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/handlerName"}
+    },
+    "handlerStatuses": {
+      "type": "object",
+      "maxProperties": 5,
+      "propertyNames": {"$ref": "#/$defs/handlerName"},
+      "additionalProperties": {
+        "enum": [
+          "method-body-present-unverified",
+          "notimplemented-only",
+          "contains-notimplemented",
+          "method-missing"
+        ]
+      }
+    },
+    "handlerContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_source", "schema_sha256", "schema_declared_handlers", "handler_statuses", "static_status"],
+      "properties": {
+        "schema_source": {"type": "string", "pattern": "^localstack-core/localstack/services/.+\\.schema\\.json$"},
+        "schema_sha256": {"$ref": "#/$defs/sha256"},
+        "schema_declared_handlers": {"$ref": "#/$defs/handlerNames"},
+        "handler_statuses": {"$ref": "#/$defs/handlerStatuses"},
+        "static_status": {
+          "enum": [
+            "all-method-bodies-present-unverified",
+            "incomplete-static-handler-surface",
+            "no-schema-handler-declarations"
+          ]
+        }
+      }
+    }
+  }
+}

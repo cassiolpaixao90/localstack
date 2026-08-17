@@ -14,10 +14,25 @@ from localstack.capabilities.catalog import (
     generate_artifacts,
     load_botocore_models,
     render_json,
+    scan_cloudformation_resources,
     scan_generated_apis,
     scan_providers,
     validate_catalog,
 )
+
+
+def test_cloudformation_scanner_normalizes_cognito_service_directories(tmp_path: Path):
+    resource_provider = (
+        tmp_path
+        / "localstack-core/localstack/services/cognito_idp/resource_providers/aws_cognito_pool.py"
+    )
+    resource_provider.parent.mkdir(parents=True)
+    resource_provider.write_text('TYPE = "AWS::Cognito::UserPool"\n')
+
+    by_service, resources = scan_cloudformation_resources(tmp_path)
+
+    assert by_service == {"cognito-idp": ("AWS::Cognito::UserPool",)}
+    assert resources[0]["source_service"] == "cognito-idp"
 
 
 def _model(*operations: str) -> ServiceModelRecord:
@@ -88,6 +103,7 @@ def _resign(catalog):
     [
         (None, None, "missing"),
         (_api("DoThing"), None, "scaffold"),
+        (None, _provider(_handler("DoThing")), "partial"),
         (_api("DoThing"), _provider(fallback="moto"), "fallback"),
         (_api("DoThing"), _provider(_handler("DoThing")), "partial"),
         (
@@ -119,6 +135,18 @@ def test_catalog_generation_is_deterministic():
     assert first == second
     assert "generated_at" not in first
     assert "native_handler_requires_runtime_evidence" in first
+
+
+def test_manual_handler_without_generated_interface_is_not_reported_missing():
+    catalog = _build(_model("DoThing", "StillMissing"), None, _provider(_handler("DoThing")))
+    service = catalog["services"]["sample"]
+
+    assert service["operation_statuses"]["partial"] == ["DoThing"]
+    assert service["operation_statuses"]["missing"] == ["StillMissing"]
+    assert service["implementations"]["DoThing"]["reasons"] == [
+        "native_handler_requires_runtime_evidence",
+        "manual_handler_without_generated_interface",
+    ]
 
 
 def test_rendered_catalog_can_be_loaded_and_validated():

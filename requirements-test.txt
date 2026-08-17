@@ -44,20 +44,19 @@ aws-sam-translator==1.107.0
     #   moto-ext
 aws-xray-sdk==2.15.0
     # via moto-ext
-awscli==1.44.49
+awscli==1.46.0
     # via localstack-core
 awscrt==0.31.2
     # via localstack-core
-boto3==1.42.59
+boto3==1.43.67
     # via
     #   aws-sam-translator
     #   kclpy-ext
     #   localstack-core
     #   moto-ext
-botocore==1.42.59
+botocore==1.43.67
     # via
     #   aws-xray-sdk
-    #   awscli
     #   boto3
     #   localstack-core
     #   moto-ext
@@ -174,6 +173,7 @@ jinja2==3.1.6
     #   moto-ext
 jmespath==1.1.0
     # via
+    #   awscli
     #   boto3
     #   botocore
 joserfc==1.6.3
@@ -341,6 +341,7 @@ pytest-tinybird==0.5.0
     # via localstack-core (pyproject.toml)
 python-dateutil==2.9.0.post0
     # via
+    #   awscli
     #   botocore
     #   jsii
     #   localstack-core
@@ -400,10 +401,8 @@ rpds-py==0.30.0
     #   referencing
 rsa==4.7.2
     # via awscli
-s3transfer==0.16.0
-    # via
-    #   awscli
-    #   boto3
+s3transfer==0.19.2
+    # via boto3
 semver==3.0.4
     # via
     #   localstack-core
@@ -441,6 +440,7 @@ typing-inspection==0.4.2
     # via pydantic
 urllib3==2.6.3
     # via
+    #   awscli
     #   botocore
     #   docker
     #   localstack-core

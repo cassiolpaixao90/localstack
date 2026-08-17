@@ -305,6 +305,16 @@ class ResponseSerializer(abc.ABC):
         serialized_response = self._prepare_additional_traits_in_response(
             serialized_response, operation_model, request_id
         )
+        retry_after = getattr(error, "retry_after_seconds", None)
+        if (
+            isinstance(retry_after, (int, float))
+            and not isinstance(retry_after, bool)
+            and math.isfinite(retry_after)
+            and retry_after > 0
+        ):
+            serialized_response.headers["Retry-After"] = str(
+                min(2**31 - 1, max(1, math.ceil(retry_after)))
+            )
         return serialized_response
 
     def _serialize_response(

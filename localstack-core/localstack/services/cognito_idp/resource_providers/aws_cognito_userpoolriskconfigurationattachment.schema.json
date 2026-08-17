@@ -1,0 +1,55 @@
+{
+  "typeName": "AWS::Cognito::UserPoolRiskConfigurationAttachment",
+  "description": "Executable local Cognito compromised-credential and IP exception controls.",
+  "additionalProperties": false,
+  "properties": {
+    "ClientId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[\\w+]+$"},
+    "CompromisedCredentialsRiskConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Actions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"EventAction": {"type": "string", "enum": ["BLOCK", "NO_ACTION"]}},
+          "required": ["EventAction"]
+        },
+        "EventFilter": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "enum": ["SIGN_IN"]}
+        }
+      },
+      "required": ["Actions"]
+    },
+    "RiskExceptionConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "BlockedIPRangeList": {"$ref": "#/definitions/ipRanges"},
+        "SkippedIPRangeList": {"$ref": "#/definitions/ipRanges"}
+      }
+    },
+    "UserPoolId": {"type": "string", "minLength": 1, "maxLength": 55, "pattern": "^[\\w-]+_[0-9a-zA-Z]+$"}
+  },
+  "definitions": {
+    "ipRanges": {
+      "type": "array",
+      "maxItems": 200,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 64}
+    }
+  },
+  "required": ["ClientId", "UserPoolId"],
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/ClientId"],
+  "createOnlyProperties": ["/properties/UserPoolId", "/properties/ClientId"],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:SetRiskConfiguration"]},
+    "read": {"permissions": ["cognito-idp:DescribeRiskConfiguration"]},
+    "update": {"permissions": ["cognito-idp:SetRiskConfiguration"]},
+    "delete": {"permissions": ["cognito-idp:SetRiskConfiguration"]}
+  }
+}

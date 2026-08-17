@@ -36,8 +36,7 @@ console = Console()
     "--image",
     type=str,
     required=False,
-    help="Overwrite the container image to be used (defaults to localstack/localstack or "
-    "localstack/localstack-pro).",
+    help="Overwrite the container image to be used (defaults to localstack/localstack).",
 )
 @click.option(
     "--volume-dir",

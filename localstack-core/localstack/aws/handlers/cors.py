@@ -141,6 +141,27 @@ DYNAMIC_INTERNAL_ORIGINS = (
     re.compile("(.*)\\.cloudfront\\.(.[^:]*)(:[0-9]{2,5})?"),
 )
 
+_COGNITO_IDP_OAUTH_HOST = re.compile(
+    r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.localhost\.localstack\.cloud"
+    r"(?::[0-9]{1,5})?$"
+)
+_COGNITO_IDP_PUBLIC_PATH = re.compile(
+    r"^/[a-z]{2}(?:-[a-z0-9]+)+-[0-9]_[A-Za-z0-9]{1,64}/\.well-known/"
+    r"(?:jwks\.json|openid-configuration)$"
+)
+_COGNITO_IDP_OAUTH_METHODS = {
+    "/login": {"GET", "POST"},
+    "/signup": {"GET", "POST"},
+    "/confirm": {"POST"},
+    "/logout": {"GET"},
+    "/oauth2/authorize": {"GET"},
+    "/oauth2/idpresponse": {"GET", "POST"},
+    "/oauth2/revoke": {"OPTIONS", "POST"},
+    "/oauth2/token": {"OPTIONS", "POST"},
+    "/oauth2/userInfo": {"GET", "OPTIONS", "POST"},
+    "/saml2/idpresponse": {"POST"},
+}
+
 
 def is_execute_api_call(context: RequestContext) -> bool:
     path = context.request.path
@@ -160,6 +181,13 @@ def should_enforce_self_managed_service(context: RequestContext) -> bool:
     :return: True if the CORS rules should be enforced in here.
     """
     # allow only certain api calls without checking origin as those services self-manage CORS
+    if context.request.method == "GET" and _COGNITO_IDP_PUBLIC_PATH.fullmatch(context.request.path):
+        return False
+    if context.request.method in _COGNITO_IDP_OAUTH_METHODS.get(
+        context.request.path, set()
+    ) and _COGNITO_IDP_OAUTH_HOST.fullmatch(context.request.host.lower()):
+        return False
+
     if not config.DISABLE_CUSTOM_CORS_S3:
         if context.service and context.service.service_name == "s3":
             return False

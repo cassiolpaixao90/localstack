@@ -120,12 +120,12 @@ moving a measured component.
 
 The deterministic Botocore-denominator inventory currently finds:
 
-- 415 Botocore services and 17,854 operations in the denominator;
-- 37 generated API interfaces and 35 services with registered providers;
-- 15,004 missing operations, 286 generated scaffolds, 1,939 fallback
-  candidates, and 625 partial/native candidates;
+- 429 Botocore services and 18,993 operations in the denominator;
+- 37 generated API interfaces and 39 services with registered providers;
+- 15,932 missing operations, 286 generated scaffolds, 1,939 fallback
+  candidates, and 836 partial/native candidates;
 - zero operations promoted to `native` or `parity-pass` without runtime proof;
-- 102 CloudFormation resource types found by static source analysis;
+- 129 CloudFormation resource-provider types found by static source analysis;
 - approximately 4,600 tests or validation entries;
 - performance tests concentrated mainly on SQS and DynamoDB, without systematic
   CI regression gates.
@@ -387,6 +387,81 @@ resource is not complete if an unimplemented update is reported as success.
 Expected result with 10-14 engineers: 15-25 useful control planes and 8-12
 services at L3/L4.
 
+### Cognito and Amplify compatibility program
+
+Treat Cognito compatibility as its own security program, not as User Pool CRUD
+or a Moto-backed service label. The target is that unmodified Amplify Auth
+clients can use the emulator from web, React Native, Android, iOS, macOS, and
+Flutter with the same public API, redirect, token, and hosted-login contracts
+that they use with AWS.
+
+The first native vertical is intentionally narrower: User Pool and User Pool
+Client lifecycle, password authentication, per-pool RS256 signing keys and
+JWKS, refresh, revocation, and strict cleanup through CloudFormation and the
+real CDK. Passwords must use a salted adaptive KDF; refresh tokens are stored
+only as hashes; unsupported flows fail closed instead of falling through to a
+permissive emulator.
+
+The current unpromoted foundation implements 18 of the pinned 122 Cognito IDP
+operations as runtime-unverified `partial` candidates and keeps the other 104
+explicitly `missing`. It provides account/region-isolated User Pool and client
+state, PBKDF2 password hashes, distinct RS256 ID/access keys, bounded public
+JWKS discovery, password auth, refresh, revocation, OAuth client configuration,
+and prefix-domain control plane. It is not yet a Cognito, Amplify, Hosted UI,
+SRP, MFA, OAuth/OIDC protocol, or CDK compatibility claim. CloudFormation
+providers for all sixteen pinned `AWS::Cognito::*` L1 types now exist as
+unpromoted static candidates, but restart persistence and their real CLI
+lifecycle have not been proven.
+Those labels remain blocked on the phased black-box matrices below.
+
+The first Cognito Identity foundation separately implements six of the pinned
+23 operations as runtime-unverified `partial` candidates: pool
+create/describe/update/delete/list and guest `GetId`. The other 17 operations
+remain explicitly `missing`. It has native state, isolation, bounded
+pagination, quotas, atomic indexes, and serialized-state tests, but it does not
+yet validate User Pool logins, assign roles, issue STS credentials, or prove
+IAM enforcement. Cognito Sync remains 17 of 17 operations missing.
+
+The executable completion contract and Billgym/Amplify client matrix are
+tracked in [`cognito-compatibility-roadmap.md`](cognito-compatibility-roadmap.md).
+
+Build on that foundation in this order:
+
+1. user lifecycle, attributes, groups, password policy, account recovery, and
+   stable AWS-shaped errors;
+2. SRP, MFA and OTP challenges, devices, remembered sessions, passkeys, and
+   custom authentication triggers;
+3. OAuth 2.0 and OIDC endpoints including authorization code, S256 PKCE,
+   refresh and client-credentials grants, scopes, nonce, state, user info,
+   revocation, introspection-equivalent behavior, and discovery metadata;
+4. managed-login and classic Hosted UI pages, cookies, callback validation,
+   logout, localization, branding assets, custom domains, and TLS behavior;
+5. OIDC, SAML, Google, Apple, Facebook, and Login with Amazon federation with
+   attribute mapping and account linking;
+6. Identity Pools backed by STS web-identity credentials, roles, principal
+   tags, and policy enforcement; Cognito Sync remains a separately measured
+   service;
+7. black-box client matrices for Amplify JavaScript/React, React Native,
+   Swift, Android, and Flutter, including deep-link and browser-session flows.
+
+The acceptance suite must exercise the real Amplify SDKs and UI components,
+not project-owned substitutes. It must cover sign-up/sign-in/sign-out,
+password reset, token refresh/revoke, PKCE redirects, mobile deep links,
+cross-tab/browser sessions, clock skew, replay, key rotation, disabled users,
+invalid clients, and cleanup. Managed login is not complete until the
+`/oauth2/authorize`, `/login`, `/oauth2/token`, `/oauth2/revoke`, `/logout`,
+`/oauth2/userInfo`, discovery, and JWKS surfaces interoperate with those
+clients. AWS documents the current contracts in its
+[managed-login endpoint reference](https://docs.aws.amazon.com/cognito/latest/developerguide/managed-login-endpoints.html),
+[authorization endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/authorization-endpoint.html),
+[token endpoint](https://docs.aws.amazon.com/cognito/latest/developerguide/token-endpoint.html),
+and [PKCE guide](https://docs.aws.amazon.com/cognito/latest/developerguide/using-pkce-in-authorization-code.html).
+
+No Cognito-wide or Amplify-wide support claim is allowed until the frozen API,
+CloudFormation/CDK, protocol, SDK, UI, security, persistence, and multi-platform
+matrices have no undeclared gaps. Each earlier milestone must name the exact
+flow and client versions it proves.
+
 ### Wave 3: broad surface, months 12-24
 
 - Athena and Glue Catalog.
@@ -431,6 +506,33 @@ Assembly—not the implementation language of the CDK application.
 | Transforms | SAM, Include, LanguageExtensions, and Lambda macros |
 | Nested stacks | Parent/child lifecycle, S3 templates, outputs, and rollback |
 | CloudControl | CRUD over the shared resource-provider registry |
+
+The generated CDK service map in
+[`capabilities/cdk/services.json`](../capabilities/cdk/services.json) fixes the
+planning denominator at `aws-cdk-lib` 2.241.0: all 300 top-level AWS/Alexa
+construct namespaces and their exact TypeScript/JavaScript, Python, Java, .NET,
+and Go bindings; 1,557 distinct L1 resource types; and all 1,555 entries from
+this repository's `AWS_AVAILABLE_CFN_RESOURCES` catalog. It resolves 126 L1
+types to concrete LocalStack resource-provider implementations (8.09%).
+Generated abstract bases count only when their plugins resolve an existing
+concrete class. Only eight namespaces have a provider for every pinned L1 type;
+21 are partial and 243 have none. This is not a support percentage: the static
+catalog has no `native` or `parity-pass` operations and does not establish
+lifecycle correctness.
+
+Use the map in four evidence tiers: inventory (`T0`), provider registration
+(`T1`), complete local lifecycle including rollback and cleanup (`T2`), and
+cross-service plus fresh AWS differential evidence (`T3`). First turn the 17
+types in DynamoDB, Elasticsearch, Kinesis Firehose, Scheduler, Secrets Manager,
+SNS, and SQS from static-complete into runtime evidence, starting with SQS and
+DynamoDB. Then assess small, low-dependency gaps such as EventBridge Archive;
+assess Lambda Capacity Provider separately because its runtime semantics are
+larger than that one-file static gap suggests. Keep
+cross-region KMS replication, ECR enablement, and advanced S3 Access Grants,
+MRAP, and Storage Lens resources out of the quick-win queue. API candidates are
+joined independently for every CloudFormation namespace; unmapped aliases and
+transform/engine-native resource types require manual classification instead of
+an automatic provider recommendation.
 
 CDK custom resources execute AWS-authored Lambda code that does not know about
 local endpoints. They require transparent endpoint injection/DNS inside the
@@ -548,6 +650,28 @@ JUnit and teardown prove temporary-output cleanup, and aggregates and attests
 the two native receipts under a Python-synth-specific namespace. That record
 remains a candidate pending separate review.
 
+Run `31307734639` for commit
+`7d2ce5f636f87785262185bce42aa497d88ee50b` is the first complete candidate
+from that contract. Native amd64, native arm64, and the aggregate passed; its
+exact aggregate and Sigstore bundle are retained under
+`capabilities/cdk/evidence/runs/31307734639/`. Review confirms the run and
+signature boundaries, but the signed record remains ineligible for promotion:
+the Python distributions were not installed from a content-addressed source.
+The workflow now adds that boundary without reinterpreting the
+retained record: it downloads a closed 14-wheel application closure plus a
+pinned pip wheel by immutable PyPI URLs and hashes, then installs them as a
+non-root user inside the loopback-only namespace into a dedicated venv with no
+index or source distributions and no pip installed into the target environment.
+Before the hash-locked install, the pinned pip resolver proves offline that the
+four exact roots select exactly the closed 14-wheel application set. The venv
+and manifest become root-owned, are remounted read-only, and the executed
+interpreter is revalidated against the installed `site-packages` tree digest
+before synthesis. A separate evidence schema v2 binds the wheel origins,
+lock, installer, installed metadata, and installed `site-packages` tree digest.
+Only a new first-attempt native amd64/arm64 aggregate and its separate Sigstore
+attestation can become the next review candidate; this implementation does not
+promote Python or Cloud Assembly by itself.
+
 The gate invokes
 the pinned CLI against a fixed Python app using `aws-cdk-lib` 2.241.0,
 `constructs` 10.5.1, and the default stack synthesizer with one L1
@@ -557,11 +681,11 @@ regular-file-only Cloud Assembly, validates its emitted schema version, and
 closes the template and construct-tree shape. It runs without lookups,
 user-authored file or Docker assets, CloudFormation resource path metadata,
 external egress, or deployment. Its receipts, aggregate, and attestation remain
-separate from both retained bootstrap evidence streams. Until a first-attempt
-candidate is reviewed and promoted, this does not promote Python, `synth`,
-Cloud Assembly, SQS deployment, or any other language binding. The candidate
-also records that the Python distributions are version-pinned but not yet
-installed from a content-addressed lock.
+separate from both retained bootstrap evidence streams. Until a new v2
+first-attempt candidate is reviewed and promoted, this does not promote Python,
+`synth`, Cloud Assembly, SQS deployment, or any other language binding. The
+retained v1 candidate continues to record the earlier version-pinned,
+non-content-addressed installation and remains ineligible.
 
 The current LocalStack documentation is useful as a compatibility baseline:
 it describes `cdklocal` as a thin wrapper, the newer `lstk cdk` path for CDK

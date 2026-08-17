@@ -1,0 +1,58 @@
+{
+  "typeName": "AWS::Cognito::LogDeliveryConfiguration",
+  "description": "Configures local Cognito user-notification and user-auth-event log delivery.",
+  "additionalProperties": false,
+  "properties": {
+    "LogConfigurations": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 2,
+      "items": {"$ref": "#/definitions/LogConfiguration"}
+    },
+    "UserPoolId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 55,
+      "pattern": "^[\\w-]+_[0-9a-zA-Z]+$"
+    }
+  },
+  "definitions": {
+    "LogConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "CloudWatchLogsConfiguration": {"$ref": "#/definitions/CloudWatchLogsConfiguration"},
+        "EventSource": {"type": "string", "enum": ["userNotification", "userAuthEvents"]},
+        "FirehoseConfiguration": {"$ref": "#/definitions/FirehoseConfiguration"},
+        "LogLevel": {"type": "string", "enum": ["ERROR", "INFO"]},
+        "S3Configuration": {"$ref": "#/definitions/S3Configuration"}
+      },
+      "required": ["EventSource", "LogLevel"]
+    },
+    "CloudWatchLogsConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"LogGroupArn": {"type": "string", "minLength": 20, "maxLength": 2048}}
+    },
+    "FirehoseConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"StreamArn": {"type": "string", "minLength": 20, "maxLength": 2048}}
+    },
+    "S3Configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"BucketArn": {"type": "string", "minLength": 3, "maxLength": 1024}}
+    }
+  },
+  "required": ["UserPoolId"],
+  "primaryIdentifier": ["/properties/UserPoolId"],
+  "createOnlyProperties": ["/properties/UserPoolId"],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:SetLogDeliveryConfiguration"]},
+    "read": {"permissions": ["cognito-idp:GetLogDeliveryConfiguration"]},
+    "update": {"permissions": ["cognito-idp:SetLogDeliveryConfiguration"]},
+    "delete": {"permissions": ["cognito-idp:SetLogDeliveryConfiguration"]}
+  }
+}

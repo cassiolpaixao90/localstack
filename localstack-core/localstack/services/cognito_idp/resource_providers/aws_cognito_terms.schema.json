@@ -1,0 +1,33 @@
+{
+  "typeName": "AWS::Cognito::Terms",
+  "description": "Localized terms documents for a Cognito managed-login app client.",
+  "properties": {
+    "ClientId": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[\\w+]+$"},
+    "Enforcement": {"type": "string", "enum": ["NONE"]},
+    "Links": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 13,
+      "patternProperties": {
+        "^cognito:(default|dutch|english|french|spanish|german|bahasa-indonesia|italian|japanese|korean|portuguese-brazil|chinese-(simplified|traditional))$": {"type": "string", "minLength": 1, "maxLength": 1024}
+      },
+      "additionalProperties": false
+    },
+    "TermsId": {"type": "string", "format": "uuid"},
+    "TermsName": {"type": "string", "enum": ["terms-of-use", "privacy-policy"]},
+    "TermsSource": {"type": "string", "enum": ["LINK"]},
+    "UserPoolId": {"type": "string", "minLength": 1, "maxLength": 55, "pattern": "^[\\w-]+_[0-9A-Za-z]+$"}
+  },
+  "required": ["Enforcement", "Links", "TermsName", "TermsSource", "UserPoolId"],
+  "readOnlyProperties": ["/properties/TermsId"],
+  "createOnlyProperties": ["/properties/ClientId", "/properties/UserPoolId"],
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/TermsId"],
+  "additionalProperties": false,
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:CreateTerms", "cognito-idp:DescribeTerms", "cognito-idp:ListTerms"]},
+    "read": {"permissions": ["cognito-idp:DescribeTerms"]},
+    "update": {"permissions": ["cognito-idp:DescribeTerms", "cognito-idp:UpdateTerms"]},
+    "delete": {"permissions": ["cognito-idp:DeleteTerms"]},
+    "list": {"permissions": ["cognito-idp:ListUserPools", "cognito-idp:ListTerms", "cognito-idp:DescribeTerms"]}
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "typeName": "AWS::ApiGatewayV2::Authorizer",
+  "description": "Native LocalStack Cognito JWT HTTP API authorizer subset",
+  "additionalProperties": false,
+  "primaryIdentifier": ["/properties/ApiId", "/properties/AuthorizerId"],
+  "readOnlyProperties": ["/properties/AuthorizerId"],
+  "createOnlyProperties": ["/properties/ApiId"],
+  "properties": {
+    "ApiId": {"type": "string"},
+    "AuthorizerId": {"type": "string"},
+    "AuthorizerType": {"type": "string", "enum": ["JWT"]},
+    "IdentitySource": {"type": "array", "items": {"type": "string"}, "minItems": 1, "maxItems": 1},
+    "JwtConfiguration": {"type": "object"},
+    "Name": {"type": "string", "minLength": 1, "maxLength": 128}
+  },
+  "required": ["ApiId", "AuthorizerType", "IdentitySource", "JwtConfiguration", "Name"],
+  "handlers": {
+    "create": {"permissions": ["apigateway:POST"]},
+    "read": {"permissions": ["apigateway:GET"]},
+    "list": {"permissions": ["apigateway:GET"]},
+    "update": {"permissions": ["apigateway:PATCH"]},
+    "delete": {"permissions": ["apigateway:DELETE"]}
+  }
+}

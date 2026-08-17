@@ -1,0 +1,56 @@
+{
+  "typeName": "AWS::Cognito::UserPoolIdentityProvider",
+  "description": "A secure native OIDC, SAML, or social identity provider for a Cognito user pool.",
+  "additionalProperties": false,
+  "properties": {
+    "AttributeMapping": {
+      "type": "object",
+      "maxProperties": 32,
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "IdpIdentifiers": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 40}
+    },
+    "ProviderDetails": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 262144}
+    },
+    "ProviderName": {"type": "string", "minLength": 1, "maxLength": 32},
+    "ProviderType": {
+      "type": "string",
+      "enum": ["OIDC", "SAML", "Google", "Facebook", "LoginWithAmazon", "SignInWithApple"]
+    },
+    "UserPoolId": {
+      "type": "string",
+      "pattern": "^[\\w-]+_[0-9a-zA-Z]+$",
+      "minLength": 1,
+      "maxLength": 55
+    }
+  },
+  "primaryIdentifier": ["/properties/UserPoolId", "/properties/ProviderName"],
+  "required": ["ProviderDetails", "ProviderName", "ProviderType", "UserPoolId"],
+  "createOnlyProperties": [
+    "/properties/ProviderName",
+    "/properties/ProviderType",
+    "/properties/UserPoolId"
+  ],
+  "writeOnlyProperties": ["/properties/ProviderDetails/private_key"],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:CreateIdentityProvider"]},
+    "read": {"permissions": ["cognito-idp:DescribeIdentityProvider"]},
+    "update": {"permissions": ["cognito-idp:UpdateIdentityProvider"]},
+    "delete": {"permissions": ["cognito-idp:DeleteIdentityProvider"]},
+    "list": {
+      "permissions": [
+        "cognito-idp:DescribeIdentityProvider",
+        "cognito-idp:ListIdentityProviders"
+      ]
+    }
+  }
+}

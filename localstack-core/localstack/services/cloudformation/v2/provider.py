@@ -657,8 +657,15 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
             raise RuntimeError("Programming error: no update graph found for change set")
 
         change_set.set_execution_status(ExecutionStatus.EXECUTE_IN_PROGRESS)
-        # propagate the tags as this is done during execution
-        change_set.stack.tags = change_set.tags
+        if change_set.change_set_type == ChangeSetType.CREATE:
+            # A failed create retains the submitted definition for GetTemplate and audit. A failed
+            # update must keep the previously committed stack definition instead.
+            change_set.stack.resolved_parameters = change_set.resolved_parameters
+            change_set.stack.template = change_set.template
+            change_set.stack.processed_template = change_set.processed_template
+            change_set.stack.template_body = change_set.template_body
+            change_set.stack.description = change_set.template.get("Description")
+            change_set.stack.tags = change_set.tags
         change_set.stack.set_stack_status(
             StackStatus.UPDATE_IN_PROGRESS
             if change_set.change_set_type == ChangeSetType.UPDATE
@@ -673,14 +680,15 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
             # TODO: should this be cleared before or after execution?
             change_set.stack.status_reason = None
             result = change_set_executor.execute()
-            change_set.stack.resolved_parameters = change_set.resolved_parameters
-            change_set.stack.resolved_resources = result.resources
-            change_set.stack.template = change_set.template
-            change_set.stack.processed_template = change_set.processed_template
-            change_set.stack.template_body = change_set.template_body
-            change_set.stack.description = change_set.template.get("Description")
 
-            if not result.failure_message:
+            if not result.failed:
+                change_set.stack.resolved_parameters = change_set.resolved_parameters
+                change_set.stack.resolved_resources = result.resources
+                change_set.stack.template = change_set.template
+                change_set.stack.processed_template = change_set.processed_template
+                change_set.stack.template_body = change_set.template_body
+                change_set.stack.description = change_set.template.get("Description")
+                change_set.stack.tags = change_set.tags
                 new_stack_status = StackStatus.UPDATE_COMPLETE
                 if change_set.change_set_type == ChangeSetType.CREATE:
                     new_stack_status = StackStatus.CREATE_COMPLETE
@@ -700,9 +708,12 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
                     result.failure_message,
                     exc_info=LOG.isEnabledFor(logging.DEBUG) and config.CFN_VERBOSE_ERRORS,
                 )
+                if change_set.change_set_type == ChangeSetType.CREATE:
+                    # There is no previously committed resource set for a create. Retain partial
+                    # resources so the failed stack remains inspectable and deletable.
+                    change_set.stack.resolved_resources = result.resources
                 # stack status is taken care of in the executor
                 change_set.set_execution_status(ExecutionStatus.EXECUTE_FAILED)
-                change_set.stack.deletion_time = datetime.now(tz=UTC)
 
         start_worker_thread(_run)
 
@@ -969,7 +980,12 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
         if change_set.status == ChangeSetStatus.FAILED:
             return CreateStackOutput(StackId=stack.stack_id)
 
+        # Retain the submitted definition even when deployment fails so GetTemplate and failure
+        # diagnostics remain available. Runtime resources/outputs are committed only on success.
+        stack.template = change_set.template
+        stack.template_body = change_set.template_body
         stack.processed_template = change_set.processed_template
+        stack.resolved_parameters = change_set.resolved_parameters
 
         # deployment process
         stack.set_stack_status(StackStatus.CREATE_IN_PROGRESS)
@@ -978,6 +994,12 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
         def _run(*args):
             try:
                 result = change_set_executor.execute()
+                if result.failed:
+                    LOG.error("Create Stack failed: %s", result.failure_message)
+                    stack.resolved_resources = result.resources
+                    if stack.status != StackStatus.ROLLBACK_FAILED:
+                        stack.set_stack_status(StackStatus.ROLLBACK_FAILED, result.failure_message)
+                    return
                 stack.resolved_resources = result.resources
                 stack.resolved_outputs = result.outputs
                 if all(
@@ -988,12 +1010,6 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
                 else:
                     stack.set_stack_status(StackStatus.CREATE_FAILED)
 
-                # if the deployment succeeded, update the stack's template representation to that
-                # which was just deployed
-                stack.template = change_set.template
-                stack.template_body = change_set.template_body
-                stack.processed_template = change_set.processed_template
-                stack.resolved_parameters = change_set.resolved_parameters
                 stack.resolved_exports = {}
                 for output in result.outputs:
                     if export_name := output.get("ExportName"):
@@ -1151,13 +1167,8 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
             )
 
         try:
-            resource = stack.resolved_resources[logical_resource_id]
-            if resource.get("ResourceStatus") not in [
-                StackStatus.CREATE_COMPLETE,
-                StackStatus.UPDATE_COMPLETE,
-                StackStatus.ROLLBACK_COMPLETE,
-            ]:
-                raise KeyError
+            resource_state = stack.resource_states[logical_resource_id]
+            resolved_resource = stack.resolved_resources[logical_resource_id]
         except KeyError:
             raise ValidationError(
                 f"Resource {logical_resource_id} does not exist for stack {stack_name}"
@@ -1167,12 +1178,16 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
             StackName=stack.stack_name,
             StackId=stack.stack_id,
             LogicalResourceId=logical_resource_id,
-            PhysicalResourceId=resource["PhysicalResourceId"],
-            ResourceType=resource["Type"],
-            LastUpdatedTimestamp=resource["LastUpdatedTimestamp"],
-            ResourceStatus=resource["ResourceStatus"],
+            PhysicalResourceId=resource_state.get("PhysicalResourceId")
+            or resolved_resource["PhysicalResourceId"],
+            ResourceType=resource_state["ResourceType"],
+            LastUpdatedTimestamp=resource_state["Timestamp"],
+            ResourceStatus=resource_state["ResourceStatus"],
+            ResourceStatusReason=resource_state.get("ResourceStatusReason"),
             DriftInformation={"StackResourceDriftStatus": "NOT_CHECKED"},
         )
+        if not resource_detail.get("ResourceStatusReason"):
+            resource_detail.pop("ResourceStatusReason", None)
         return DescribeStackResourceOutput(StackResourceDetail=resource_detail)
 
     @handler("DescribeStackResources")
@@ -1619,7 +1634,7 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
 
         change_set = ChangeSet(
             stack,
-            {"ChangeSetName": f"cs-{stack_name}-create", "ChangeSetType": ChangeSetType.CREATE},
+            {"ChangeSetName": f"cs-{stack_name}-update", "ChangeSetType": ChangeSetType.UPDATE},
             template_body=template_body,
             template=after_template,
         )
@@ -1644,6 +1659,17 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
         def _run(*args):
             try:
                 result = change_set_executor.execute()
+                if result.failed:
+                    LOG.error(
+                        "Update Stack failed: %s",
+                        result.failure_message,
+                    )
+                    if stack.status != StackStatus.UPDATE_ROLLBACK_FAILED:
+                        stack.set_stack_status(
+                            StackStatus.UPDATE_ROLLBACK_FAILED,
+                            result.failure_message,
+                        )
+                    return
                 stack.set_stack_status(StackStatus.UPDATE_COMPLETE)
                 stack.resolved_resources = result.resources
                 stack.resolved_outputs = result.outputs
@@ -1733,7 +1759,15 @@ class CloudformationProviderV2(CloudformationProvider, ServiceLifecycleHook):
 
         def _run(*args):
             try:
-                change_set_executor.execute()
+                result = change_set_executor.execute()
+                if result.failed:
+                    LOG.warning(
+                        "Failed to delete stack '%s': %s",
+                        stack.stack_name,
+                        result.failure_message,
+                    )
+                    stack.set_stack_status(StackStatus.DELETE_FAILED, result.failure_message)
+                    return
                 stack.set_stack_status(StackStatus.DELETE_COMPLETE)
                 stack.deletion_time = datetime.now(tz=UTC)
             except Exception as e:

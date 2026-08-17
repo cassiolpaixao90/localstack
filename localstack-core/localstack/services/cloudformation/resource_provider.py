@@ -221,6 +221,110 @@ class ResourceProvider[Properties]:
         raise NotImplementedError
 
 
+def stack_tags_to_map(tags: dict[str, str] | list[dict] | None) -> dict[str, str]:
+    """Normalize the public CloudFormation tag list for the registry protocol payload."""
+    if tags is None:
+        return {}
+    if isinstance(tags, dict):
+        if not all(isinstance(key, str) and isinstance(value, str) for key, value in tags.items()):
+            raise ValueError("CloudFormation stack tags must be string key/value pairs")
+        return copy.deepcopy(tags)
+    if not isinstance(tags, list):
+        raise ValueError("CloudFormation stack tags must be a list or map")
+    result = {}
+    for tag in tags:
+        if not isinstance(tag, dict) or set(tag) != {"Key", "Value"}:
+            raise ValueError("CloudFormation stack tag entries must contain only Key and Value")
+        key = tag["Key"]
+        value = tag["Value"]
+        if not isinstance(key, str) or not isinstance(value, str) or key in result:
+            raise ValueError("CloudFormation stack tags must have unique string keys and values")
+        result[key] = value
+    return result
+
+
+def _tag_property(schema: dict) -> tuple[str, str] | None:
+    tagging = schema.get("tagging")
+    if not isinstance(tagging, dict) or tagging.get("taggable", True) is not True:
+        return None
+    pointer = tagging.get("tagProperty", "/properties/Tags")
+    prefix = "/properties/"
+    if not isinstance(pointer, str) or not pointer.startswith(prefix):
+        return None
+    encoded_name = pointer[len(prefix) :]
+    if not encoded_name or "/" in encoded_name:
+        return None
+    name = encoded_name.replace("~1", "/").replace("~0", "~")
+    property_schema = schema.get("properties", {}).get(name, {})
+    kind = property_schema.get("type") if isinstance(property_schema, dict) else None
+    if kind not in {"array", "object"}:
+        return None
+    return name, kind
+
+
+def _resource_tags(model: dict, tag_property: tuple[str, str] | None) -> dict[str, str]:
+    if tag_property is None:
+        return {}
+    name, kind = tag_property
+    value = model.get(name)
+    if value is None:
+        return {}
+    if kind == "object":
+        if not isinstance(value, dict) or not all(
+            isinstance(key, str) and isinstance(item, str) for key, item in value.items()
+        ):
+            raise ValueError(f"CloudFormation resource tag property {name} must be a string map")
+        return copy.deepcopy(value)
+    if not isinstance(value, list):
+        raise ValueError(f"CloudFormation resource tag property {name} must be a tag list")
+    result = {}
+    for tag in value:
+        if not isinstance(tag, dict):
+            raise ValueError(f"CloudFormation resource tag property {name} contains an invalid tag")
+        key = tag.get("Key")
+        item = tag.get("Value")
+        if not isinstance(key, str) or not isinstance(item, str) or key in result:
+            raise ValueError(
+                f"CloudFormation resource tag property {name} must have unique string tags"
+            )
+        result[key] = item
+    return result
+
+
+def _prepare_resource_provider_tags(resource_provider: ResourceProvider, payload: dict) -> None:
+    schema = getattr(resource_provider, "SCHEMA", {})
+    tag_property = _tag_property(schema)
+    if tag_property is None:
+        return
+    tagging = schema["tagging"]
+    action = payload["action"]
+    should_propagate = (action == "Add" and tagging.get("tagOnCreate", True) is True) or (
+        action in {"Dynamic", "Modify"} and tagging.get("tagUpdatable", True) is True
+    )
+    if not should_propagate:
+        return
+    stack_tags = stack_tags_to_map(payload["requestData"].get("stackTags"))
+    if not stack_tags:
+        return
+    properties = payload["requestData"]["resourceProperties"]
+    explicit_tags = _resource_tags(properties, tag_property)
+    merged_tags = {**stack_tags, **explicit_tags}
+    name, kind = tag_property
+    if kind == "object":
+        properties[name] = merged_tags
+        return
+    explicit = properties.get(name) or []
+    explicit_keys = set(explicit_tags)
+    properties[name] = [
+        *copy.deepcopy(explicit),
+        *(
+            {"Key": key, "Value": value}
+            for key, value in sorted(stack_tags.items())
+            if key not in explicit_keys
+        ),
+    ]
+
+
 # legacy helpers
 def get_resource_type(resource: dict) -> str:
     """this is currently overwritten in PRO to add support for custom resources"""
@@ -443,6 +547,7 @@ class ResourceProviderExecutor:
         max_iterations = max(ceil(max_timeout / sleep_time), 10)
 
         for current_iteration in range(max_iterations):
+            _prepare_resource_provider_tags(resource_provider, payload)
             resource_type = get_resource_type({"Type": raw_payload["resourceType"]})
             resource["SpecifiedProperties"] = raw_payload["requestData"]["resourceProperties"]
 
@@ -511,6 +616,10 @@ class ResourceProviderExecutor:
         request = convert_payload(
             stack_name=self.stack_name, stack_id=self.stack_id, payload=raw_payload
         )
+        tag_property = _tag_property(getattr(resource_provider, "SCHEMA", {}))
+        request.tags = _resource_tags(request.desired_state, tag_property)
+        if request.previous_state is not None:
+            request.previous_tags = _resource_tags(request.previous_state, tag_property)
 
         match change_type:
             case "Add":

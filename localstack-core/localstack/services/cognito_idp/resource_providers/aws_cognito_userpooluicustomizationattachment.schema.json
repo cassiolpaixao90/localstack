@@ -1,0 +1,40 @@
+{
+  "typeName": "AWS::Cognito::UserPoolUICustomizationAttachment",
+  "description": "A classic hosted-UI customization attachment for a Cognito user-pool app client.",
+  "additionalProperties": false,
+  "properties": {
+    "ClientId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[\\w+]+$"
+    },
+    "CSS": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 131072
+    },
+    "UserPoolId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 55,
+      "pattern": "^[\\w-]+_[0-9a-zA-Z]+$"
+    }
+  },
+  "primaryIdentifier": [
+    "/properties/UserPoolId",
+    "/properties/ClientId"
+  ],
+  "required": ["ClientId", "UserPoolId"],
+  "createOnlyProperties": [
+    "/properties/ClientId",
+    "/properties/UserPoolId"
+  ],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:SetUICustomization", "cognito-idp:GetUICustomization"]},
+    "read": {"permissions": ["cognito-idp:GetUICustomization"]},
+    "update": {"permissions": ["cognito-idp:GetUICustomization", "cognito-idp:SetUICustomization"]},
+    "delete": {"permissions": ["cognito-idp:SetUICustomization"]}
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "typeName": "AWS::Cognito::IdentityPoolPrincipalTag",
+  "description": "Principal tag mappings for a Cognito identity-pool provider.",
+  "additionalProperties": false,
+  "properties": {
+    "IdentityPoolId": {"type": "string", "minLength": 1, "maxLength": 55},
+    "IdentityProviderName": {"type": "string", "minLength": 1, "maxLength": 128},
+    "PrincipalTags": {
+      "type": "object",
+      "maxProperties": 50,
+      "propertyNames": {"type": "string", "minLength": 1, "maxLength": 128},
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 256}
+    },
+    "UseDefaults": {"type": "boolean"}
+  },
+  "required": ["IdentityPoolId", "IdentityProviderName"],
+  "primaryIdentifier": [
+    "/properties/IdentityPoolId",
+    "/properties/IdentityProviderName"
+  ],
+  "createOnlyProperties": [
+    "/properties/IdentityPoolId",
+    "/properties/IdentityProviderName"
+  ],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {
+      "permissions": [
+        "cognito-identity:GetPrincipalTagAttributeMap",
+        "cognito-identity:SetPrincipalTagAttributeMap"
+      ]
+    },
+    "read": {"permissions": ["cognito-identity:GetPrincipalTagAttributeMap"]},
+    "update": {
+      "permissions": [
+        "cognito-identity:GetPrincipalTagAttributeMap",
+        "cognito-identity:SetPrincipalTagAttributeMap"
+      ]
+    },
+    "delete": {
+      "permissions": [
+        "cognito-identity:GetPrincipalTagAttributeMap",
+        "cognito-identity:SetPrincipalTagAttributeMap"
+      ]
+    },
+    "list": {
+      "handlerSchema": {
+        "properties": {
+          "IdentityPoolId": {
+            "$ref": "resource-schema.json#/properties/IdentityPoolId"
+          },
+          "IdentityProviderName": {
+            "$ref": "resource-schema.json#/properties/IdentityProviderName"
+          }
+        },
+        "required": ["IdentityPoolId", "IdentityProviderName"]
+      },
+      "permissions": ["cognito-identity:GetPrincipalTagAttributeMap"]
+    }
+  }
+}

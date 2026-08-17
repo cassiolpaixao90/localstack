@@ -41,6 +41,14 @@ def apigateway_legacy():
     return Service.for_provider(provider, dispatch_table_factory=MotoFallbackDispatcher)
 
 
+@aws_provider(api="apigatewayv2")
+def apigatewayv2():
+    from localstack.services.apigatewayv2.provider import ApiGatewayV2Provider
+
+    provider = ApiGatewayV2Provider()
+    return Service.for_provider(provider)
+
+
 @aws_provider(api="cloudformation", name="engine-legacy")
 def cloudformation():
     from localstack.services.cloudformation.provider import CloudformationProvider
@@ -54,6 +62,30 @@ def cloudformation_v2():
     from localstack.services.cloudformation.v2.provider import CloudformationProviderV2
 
     provider = CloudformationProviderV2()
+    return Service.for_provider(provider)
+
+
+@aws_provider(api="cognito-idp")
+def cognito_idp():
+    from localstack.services.cognito_idp.provider import CognitoIdpProvider
+
+    provider = CognitoIdpProvider()
+    return Service.for_provider(provider)
+
+
+@aws_provider(api="cognito-identity")
+def cognito_identity():
+    from localstack.services.cognito_identity.provider import CognitoIdentityProvider
+
+    provider = CognitoIdentityProvider()
+    return Service.for_provider(provider)
+
+
+@aws_provider(api="cognito-sync")
+def cognito_sync():
+    from localstack.services.cognito_sync.provider import CognitoSyncProvider
+
+    provider = CognitoSyncProvider()
     return Service.for_provider(provider)
 
 

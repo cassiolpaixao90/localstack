@@ -1,0 +1,28 @@
+{
+  "typeName": "AWS::ApiGatewayV2::Integration",
+  "description": "Native LocalStack HTTP API Lambda and HTTP proxy integration subset",
+  "additionalProperties": false,
+  "primaryIdentifier": ["/properties/ApiId", "/properties/IntegrationId"],
+  "readOnlyProperties": ["/properties/ApiGatewayManaged", "/properties/IntegrationId"],
+  "createOnlyProperties": ["/properties/ApiId"],
+  "properties": {
+    "ApiGatewayManaged": {"type": "boolean"},
+    "ApiId": {"type": "string"},
+    "ConnectionType": {"type": "string", "enum": ["INTERNET"]},
+    "Description": {"type": "string"},
+    "IntegrationId": {"type": "string"},
+    "IntegrationMethod": {"type": "string", "enum": ["ANY", "DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]},
+    "IntegrationType": {"type": "string", "enum": ["AWS_PROXY", "HTTP_PROXY"]},
+    "IntegrationUri": {"type": "string", "minLength": 1},
+    "PayloadFormatVersion": {"type": "string", "enum": ["1.0", "2.0"]},
+    "TimeoutInMillis": {"type": "integer", "minimum": 50, "maximum": 30000}
+  },
+  "required": ["ApiId", "IntegrationType", "IntegrationUri"],
+  "handlers": {
+    "create": {"permissions": ["apigateway:POST"]},
+    "read": {"permissions": ["apigateway:GET"]},
+    "list": {"permissions": ["apigateway:GET"]},
+    "update": {"permissions": ["apigateway:PATCH"]},
+    "delete": {"permissions": ["apigateway:DELETE"]}
+  }
+}

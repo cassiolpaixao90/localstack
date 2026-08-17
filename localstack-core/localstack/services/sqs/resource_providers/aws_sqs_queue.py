@@ -1,7 +1,9 @@
 # LocalStack Resource Provider Scaffolding v2
 from __future__ import annotations
 
+import copy
 import json
+from urllib.parse import urlsplit
 
 import localstack.services.cloudformation.provider_utils as util
 from localstack.services.cloudformation.resource_provider import (
@@ -31,26 +33,41 @@ _queue_attribute_list = [
     "VisibilityTimeout",
 ]
 
+_queue_boolean_attributes = {
+    "ContentBasedDeduplication",
+    "FifoQueue",
+    "SqsManagedSseEnabled",
+}
+_queue_integer_attributes = {
+    "DelaySeconds",
+    "KmsDataKeyReusePeriodSeconds",
+    "MaximumMessageSize",
+    "MessageRetentionPeriod",
+    "ReceiveMessageWaitTimeSeconds",
+    "VisibilityTimeout",
+}
+_queue_json_attributes = {"RedriveAllowPolicy", "RedrivePolicy"}
+
 
 class SQSQueueProvider(SQSQueueProviderBase):
     # Values used when a property is removed from a template and needs to be set to its default.
     # If AWS changes their defaults in the future, our parity tests should break.
     DEFAULT_ATTRIBUTE_VALUES = {
-        "ReceiveMessageWaitTimeSeconds": "0",
-        "DelaySeconds": "0",
+        "ReceiveMessageWaitTimeSeconds": 0,
+        "DelaySeconds": 0,
         "KmsMasterKeyId": "",
         "RedrivePolicy": "",
-        "MessageRetentionPeriod": "345600",
-        "MaximumMessageSize": "262144",  # Note: CloudFormation sets this to 256KB on update, but 1MB on create
-        "VisibilityTimeout": "30",
-        "KmsDataKeyReusePeriodSeconds": "300",
+        "MessageRetentionPeriod": 345600,
+        "MaximumMessageSize": 262144,  # Note: CloudFormation sets this to 256KB on update, but 1MB on create
+        "VisibilityTimeout": 30,
+        "KmsDataKeyReusePeriodSeconds": 300,
         # Note that "SqsManagedSseEnabled" is deliberately omitted from this list, since AWS
         # doesn't seem to reset it to a default.
     }
 
     # Similar for FIFO, but only applied when FifoQueue is true (these can't be set otherwise)
     DEFAULT_FIFO_ATTRIBUTE_VALUES = {
-        "ContentBasedDeduplication": "false",
+        "ContentBasedDeduplication": False,
         "DeduplicationScope": "messageGroup",
         "FifoThroughputLimit": "perMessageGroupId",
     }
@@ -89,7 +106,7 @@ class SQSQueueProvider(SQSQueueProviderBase):
 
         """
         # TODO: validations - what validations are needed?
-        model = request.desired_state
+        model = copy.deepcopy(request.desired_state)
         sqs = request.aws_client_factory.sqs
 
         # if no QueueName is specified, automatically generate one
@@ -126,7 +143,51 @@ class SQSQueueProvider(SQSQueueProviderBase):
           - sqs:GetQueueAttributes
           - sqs:ListQueueTags
         """
-        raise NotImplementedError
+        sqs = request.aws_client_factory.sqs
+        queue_url = request.desired_state["QueueUrl"]
+        try:
+            attributes = sqs.get_queue_attributes(
+                QueueUrl=queue_url, AttributeNames=["All"]
+            ).get("Attributes", {})
+        except sqs.exceptions.QueueDoesNotExist:
+            return ProgressEvent(
+                status=OperationStatus.FAILED,
+                message=(
+                    f"Resource of type '{self.TYPE}' with identifier '{queue_url}' was not found."
+                ),
+                error_code="NotFound",
+            )
+
+        model = SQSQueueProperties(
+            QueueUrl=queue_url,
+            QueueName=urlsplit(queue_url).path.rstrip("/").rsplit("/", 1)[-1],
+            Arn=attributes.get("QueueArn"),
+            Tags=[
+                {"Key": key, "Value": value}
+                for key, value in sorted(
+                    sqs.list_queue_tags(QueueUrl=queue_url).get("Tags", {}).items()
+                )
+            ],
+        )
+        for name in _queue_attribute_list:
+            if (value := attributes.get(name)) is None:
+                continue
+            if name in _queue_boolean_attributes:
+                if value not in {"true", "false"}:
+                    raise ValueError(f"invalid boolean SQS queue attribute {name}: {value!r}")
+                model[name] = value == "true"
+            elif name in _queue_integer_attributes:
+                model[name] = int(value)
+            elif name in _queue_json_attributes:
+                model[name] = json.loads(value)
+            else:
+                model[name] = value
+
+        return ProgressEvent(
+            status=OperationStatus.SUCCESS,
+            resource_model=model,
+            custom_context=request.custom_context,
+        )
 
     def delete(
         self,
@@ -166,7 +227,7 @@ class SQSQueueProvider(SQSQueueProviderBase):
           - sqs:UntagQueue
         """
         sqs = request.aws_client_factory.sqs
-        model = request.desired_state
+        model = copy.deepcopy(request.desired_state)
         prev_model = request.previous_state
 
         assert request.previous_state is not None
@@ -180,8 +241,10 @@ class SQSQueueProvider(SQSQueueProviderBase):
         (tags_to_remove, tags_to_add_or_update) = util.resource_tags_to_remove_or_update(
             prev_model.get("Tags", []), model.get("Tags", [])
         )
-        sqs.untag_queue(QueueUrl=queue_url, TagKeys=tags_to_remove)
-        sqs.tag_queue(QueueUrl=queue_url, Tags=tags_to_add_or_update)
+        if tags_to_remove:
+            sqs.untag_queue(QueueUrl=queue_url, TagKeys=tags_to_remove)
+        if tags_to_add_or_update:
+            sqs.tag_queue(QueueUrl=queue_url, Tags=tags_to_add_or_update)
 
         model["QueueUrl"] = queue_url
         model["Arn"] = request.previous_state["Arn"]

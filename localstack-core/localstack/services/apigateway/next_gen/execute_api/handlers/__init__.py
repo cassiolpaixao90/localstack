@@ -4,6 +4,7 @@ from localstack.services.apigateway.analytics import invocation_counter
 
 from .analytics import IntegrationUsageCounter
 from .api_key_validation import ApiKeyValidationHandler
+from .cognito_authorizer import CognitoUserPoolsAuthorizerHandler
 from .gateway_exception import GatewayExceptionHandler
 from .integration import IntegrationHandler
 from .integration_request import IntegrationRequestHandler
@@ -25,5 +26,6 @@ integration_response_handler = IntegrationResponseHandler()
 method_response_handler = MethodResponseHandler()
 gateway_exception_handler = GatewayExceptionHandler()
 api_key_validation_handler = ApiKeyValidationHandler()
+cognito_user_pools_authorizer_handler = CognitoUserPoolsAuthorizerHandler()
 response_enricher = InvocationResponseEnricher()
 usage_counter = IntegrationUsageCounter(counter=invocation_counter)

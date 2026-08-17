@@ -1,0 +1,1032 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://localstack.cloud/schemas/cdk-python-synth-execution-evidence-v2.json",
+  "title": "LocalStack CDK Python synth execution evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_type",
+    "mode",
+    "evidence_id",
+    "claim_id",
+    "subject",
+    "run",
+    "scenario",
+    "toolchain",
+    "verification_contract",
+    "harness",
+    "lanes",
+    "promotion"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "record_type": {
+      "const": "aggregate"
+    },
+    "mode": {
+      "const": "diagnostic-candidate"
+    },
+    "evidence_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "claim_id": {
+      "$ref": "#/$defs/sha256"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit_sha",
+        "ref"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "ref": {
+          "const": "refs/heads/main"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "workflow_path",
+        "run_id",
+        "run_attempt",
+        "event"
+      ],
+      "properties": {
+        "provider": {
+          "const": "github-actions"
+        },
+        "workflow_path": {
+          "const": ".github/workflows/cdk-cli-blackbox.yml"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "run_attempt": {
+          "const": 1
+        },
+        "event": {
+          "const": "push"
+        }
+      }
+    },
+    "scenario": {
+      "$ref": "#/$defs/scenario"
+    },
+    "toolchain": {
+      "$ref": "#/$defs/aggregateToolchain"
+    },
+    "verification_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assembly",
+        "cleanup",
+        "supply_chain"
+      ],
+      "properties": {
+        "assembly": {
+          "$ref": "#/$defs/assemblyContract"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/cleanup"
+        },
+        "supply_chain": {
+          "$ref": "#/$defs/supplyChainContract"
+        }
+      }
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "input_sha256"
+      ],
+      "properties": {
+        "input_sha256": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            ".github/workflows/cdk-cli-blackbox.yml",
+            ".python-version",
+            "Makefile",
+            "capabilities/cdk/compatibility.json",
+            "capabilities/cdk/python-synth-execution-evidence-v2.schema.json",
+            "localstack-core/localstack/cli/_cdk_health_probe.py",
+            "localstack-core/localstack/cli/cdk.py",
+            "pyproject.toml",
+            "requirements-test.txt",
+            "scripts/run_cdk_cli_blackbox_isolated.sh",
+            "tests/aws/cli/execution_evidence.py",
+            "tests/aws/cli/fixtures/cdk_apps/python/minimal_sqs.py",
+            "tests/aws/cli/package-lock.json",
+            "tests/aws/cli/package.json",
+            "tests/aws/cli/python-synth-requirements.lock",
+            "tests/aws/cli/python-synth-wheel-origins.json",
+            "tests/aws/cli/python_synth_execution_evidence_v2.py",
+            "tests/aws/cli/python_synth_toolchain.py",
+            "tests/aws/cli/test_cdk_cli_blackbox.py",
+            "tests/aws/cli/test_cdk_cli_bootstrap_upgrade.py",
+            "tests/aws/cli/test_cdk_cli_python_synth.py",
+            "tests/aws/cli/validate_junit.py"
+          ],
+          "properties": {
+            ".github/workflows/cdk-cli-blackbox.yml": {
+              "$ref": "#/$defs/sha256"
+            },
+            ".python-version": {
+              "$ref": "#/$defs/sha256"
+            },
+            "Makefile": {
+              "$ref": "#/$defs/sha256"
+            },
+            "capabilities/cdk/compatibility.json": {
+              "$ref": "#/$defs/sha256"
+            },
+            "localstack-core/localstack/cli/_cdk_health_probe.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "localstack-core/localstack/cli/cdk.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "pyproject.toml": {
+              "$ref": "#/$defs/sha256"
+            },
+            "requirements-test.txt": {
+              "$ref": "#/$defs/sha256"
+            },
+            "scripts/run_cdk_cli_blackbox_isolated.sh": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/execution_evidence.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/fixtures/cdk_apps/python/minimal_sqs.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/package-lock.json": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/package.json": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/test_cdk_cli_blackbox.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/test_cdk_cli_bootstrap_upgrade.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/test_cdk_cli_python_synth.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/validate_junit.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "capabilities/cdk/python-synth-execution-evidence-v2.schema.json": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/python-synth-requirements.lock": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/python-synth-wheel-origins.json": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/python_synth_execution_evidence_v2.py": {
+              "$ref": "#/$defs/sha256"
+            },
+            "tests/aws/cli/python_synth_toolchain.py": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      }
+    },
+    "lanes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/laneReceipt"
+            },
+            {
+              "properties": {
+                "platform": {
+                  "properties": {
+                    "id": {
+                      "const": "linux-amd64"
+                    },
+                    "machine_arch": {
+                      "const": "x86_64"
+                    },
+                    "node_arch": {
+                      "const": "x64"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/laneReceipt"
+            },
+            {
+              "properties": {
+                "platform": {
+                  "properties": {
+                    "id": {
+                      "const": "linux-arm64"
+                    },
+                    "machine_arch": {
+                      "const": "aarch64"
+                    },
+                    "node_arch": {
+                      "const": "arm64"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "items": false
+    },
+    "promotion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eligible",
+        "blockers"
+      ],
+      "properties": {
+        "eligible": {
+          "const": false
+        },
+        "blockers": {
+          "const": [
+            "not-reviewed-for-promotion",
+            "no-deploy",
+            "no-aws-differential",
+            "only-python"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "utc": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$"
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "result",
+        "construct_language",
+        "cloud_assembly_produced",
+        "resource_deployment_performed",
+        "aws_differential",
+        "user_authored_assets",
+        "cleanup_required"
+      ],
+      "properties": {
+        "id": {
+          "const": "synth-python-minimal-sqs-v1"
+        },
+        "result": {
+          "const": "cli-pass"
+        },
+        "construct_language": {
+          "const": "python"
+        },
+        "cloud_assembly_produced": {
+          "const": true
+        },
+        "resource_deployment_performed": {
+          "const": false
+        },
+        "aws_differential": {
+          "const": false
+        },
+        "user_authored_assets": {
+          "const": false
+        },
+        "cleanup_required": {
+          "const": true
+        }
+      }
+    },
+    "pythonPackages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "aws-cdk-lib",
+        "aws-cdk-cloud-assembly-schema",
+        "constructs",
+        "jsii"
+      ],
+      "properties": {
+        "aws-cdk-lib": {
+          "const": "2.241.0"
+        },
+        "aws-cdk-cloud-assembly-schema": {
+          "const": "52.2.0"
+        },
+        "constructs": {
+          "const": "10.5.1"
+        },
+        "jsii": {
+          "const": "1.127.0"
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_version",
+        "cdk_cli_version",
+        "python_packages",
+        "cloud_assembly_schema_sha256",
+        "emitted_assembly_version"
+      ],
+      "properties": {
+        "node_version": {
+          "const": "22.23.2"
+        },
+        "cdk_cli_version": {
+          "const": "2.1135.1"
+        },
+        "python_packages": {
+          "$ref": "#/$defs/pythonPackages"
+        },
+        "cloud_assembly_schema_sha256": {
+          "const": "sha256:ba8defba06c63d1a9ae2c7218c0d089372547629205b5fcb862ddd911efef3f8"
+        },
+        "emitted_assembly_version": {
+          "const": "52.0.0"
+        }
+      }
+    },
+    "aggregateToolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_version",
+        "cdk_cli_version",
+        "python_packages",
+        "cloud_assembly_schema_sha256",
+        "emitted_assembly_version",
+        "npm_integrity"
+      ],
+      "properties": {
+        "node_version": {
+          "const": "22.23.2"
+        },
+        "cdk_cli_version": {
+          "const": "2.1135.1"
+        },
+        "python_packages": {
+          "$ref": "#/$defs/pythonPackages"
+        },
+        "cloud_assembly_schema_sha256": {
+          "const": "sha256:ba8defba06c63d1a9ae2c7218c0d089372547629205b5fcb862ddd911efef3f8"
+        },
+        "emitted_assembly_version": {
+          "const": "52.0.0"
+        },
+        "npm_integrity": {
+          "const": "sha512-g1jcMfWlyYtGamFJ/kPBOCuchl3NfwTF2UwOLTIDN0nJbGm84EAO+c8DlYnaemM8UmKFkdoq4BGdmiNL5nHWwA=="
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit_sha",
+        "ref",
+        "event",
+        "workflow_path",
+        "run_id",
+        "run_attempt"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "ref": {
+          "const": "refs/heads/main"
+        },
+        "event": {
+          "const": "push"
+        },
+        "workflow_path": {
+          "const": ".github/workflows/cdk-cli-blackbox.yml"
+        },
+        "run_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9223372036854775807
+        },
+        "run_attempt": {
+          "const": 1
+        }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "machine_arch",
+        "node_arch",
+        "python_version",
+        "kernel_release"
+      ],
+      "properties": {
+        "id": {
+          "enum": [
+            "linux-amd64",
+            "linux-arm64"
+          ]
+        },
+        "machine_arch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "node_arch": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "python_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "kernel_release": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stack_name",
+        "argv_contract",
+        "app_sha256"
+      ],
+      "properties": {
+        "stack_name": {
+          "const": "SynthStack"
+        },
+        "argv_contract": {
+          "const": "synth-python-minimal-sqs-v1"
+        },
+        "app_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "assemblyContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stack_name",
+        "resource_type",
+        "default_stack_synthesizer",
+        "top_level_references_closed",
+        "template_asset_hash"
+      ],
+      "properties": {
+        "stack_name": {
+          "const": "SynthStack"
+        },
+        "resource_type": {
+          "const": "AWS::SQS::Queue"
+        },
+        "default_stack_synthesizer": {
+          "const": true
+        },
+        "top_level_references_closed": {
+          "const": true
+        },
+        "template_asset_hash": {
+          "const": "039a840a9267a7acf895d29d5f2bd4894a720070cff12e3f10dd9852b76f4e1c"
+        }
+      }
+    },
+    "assemblyFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "bytes",
+        "sha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "assembly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "files",
+        "total_bytes"
+      ],
+      "properties": {
+        "contract": {
+          "$ref": "#/$defs/assemblyContract"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/assemblyFile"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "SynthStack.assets.json"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/assemblyFile"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "SynthStack.template.json"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/assemblyFile"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "cdk.out"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/assemblyFile"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "manifest.json"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/assemblyFile"
+                },
+                {
+                  "properties": {
+                    "name": {
+                      "const": "tree.json"
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 2097152
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "returncode",
+        "timed_out",
+        "duration_ms",
+        "stdout_bytes",
+        "stderr_bytes",
+        "stdout_sha256",
+        "stderr_sha256",
+        "stdout_truncated",
+        "stderr_truncated"
+      ],
+      "properties": {
+        "status": {
+          "const": "pass"
+        },
+        "returncode": {
+          "const": 0
+        },
+        "timed_out": {
+          "const": false
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000
+        },
+        "stdout_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 262144
+        },
+        "stderr_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 262144
+        },
+        "stdout_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "stderr_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "stdout_truncated": {
+          "const": false
+        },
+        "stderr_truncated": {
+          "const": false
+        }
+      }
+    },
+    "junit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sha256",
+        "bytes"
+      ],
+      "properties": {
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1048576
+        }
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "interface_names"
+      ],
+      "properties": {
+        "profile_id": {
+          "const": "linux-net-pid-mount-nobody-v1"
+        },
+        "interface_names": {
+          "const": [
+            "lo"
+          ]
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completed",
+        "assembly_output_absent"
+      ],
+      "properties": {
+        "completed": {
+          "const": true
+        },
+        "assembly_output_absent": {
+          "const": true
+        }
+      }
+    },
+    "laneReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_type",
+        "receipt_id",
+        "scenario",
+        "toolchain",
+        "run",
+        "platform",
+        "command",
+        "assembly",
+        "result",
+        "junit",
+        "isolation",
+        "cleanup",
+        "observed_at",
+        "completed_at",
+        "supply_chain"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 2
+        },
+        "record_type": {
+          "const": "lane-receipt"
+        },
+        "receipt_id": {
+          "$ref": "#/$defs/sha256"
+        },
+        "scenario": {
+          "$ref": "#/$defs/scenario"
+        },
+        "toolchain": {
+          "$ref": "#/$defs/toolchain"
+        },
+        "run": {
+          "$ref": "#/$defs/run"
+        },
+        "platform": {
+          "$ref": "#/$defs/platform"
+        },
+        "command": {
+          "$ref": "#/$defs/command"
+        },
+        "assembly": {
+          "$ref": "#/$defs/assembly"
+        },
+        "result": {
+          "$ref": "#/$defs/result"
+        },
+        "junit": {
+          "$ref": "#/$defs/junit"
+        },
+        "isolation": {
+          "$ref": "#/$defs/isolation"
+        },
+        "cleanup": {
+          "$ref": "#/$defs/cleanup"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/utc"
+        },
+        "completed_at": {
+          "$ref": "#/$defs/utc"
+        },
+        "supply_chain": {
+          "$ref": "#/$defs/supplyChain"
+        }
+      }
+    },
+    "supplyChainContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "origins_sha256",
+        "lock_sha256",
+        "runtime_wheel_inventory_sha256",
+        "runtime_wheel_count",
+        "runtime_wheel_total_bytes",
+        "installed_metadata_sha256",
+        "installer",
+        "installation"
+      ],
+      "properties": {
+        "profile": {
+          "const": "official-wheel-origins-resolved-hash-locked-offline-venv-v2"
+        },
+        "origins_sha256": {
+          "const": "sha256:8b6b4587079238976f90063c1a56730c1f3341c2ac5836908d4504db80b1efb1"
+        },
+        "lock_sha256": {
+          "const": "sha256:b59bb9d70da365d145fc5b8ac01839da9de6853eb304b3c013aa6ab8c6803399"
+        },
+        "runtime_wheel_inventory_sha256": {
+          "const": "sha256:fd0a1699615525422b92d8676036b5e376d1def1dd72373666e939df8f050668"
+        },
+        "runtime_wheel_count": {
+          "const": 14
+        },
+        "runtime_wheel_total_bytes": {
+          "const": 71824153
+        },
+        "installed_metadata_sha256": {
+          "const": "sha256:82850eb3ba098852ccaf0a4ed2e323b3453d91c0f7a2f60811168b10cc8048fb"
+        },
+        "installer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project",
+            "version",
+            "filename",
+            "bytes",
+            "sha256"
+          ],
+          "properties": {
+            "project": {
+              "const": "pip"
+            },
+            "version": {
+              "const": "26.0.1"
+            },
+            "filename": {
+              "const": "pip-26.0.1-py3-none-any.whl"
+            },
+            "bytes": {
+              "const": 1787723
+            },
+            "sha256": {
+              "const": "sha256:bdb1b08f4274833d62c1aa29e20907365a2ceb950410df15fc9521bad440122b"
+            }
+          }
+        },
+        "installation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "network_isolated",
+            "non_root",
+            "venv_without_pip",
+            "venv_read_only_at_runtime",
+            "runtime_environment_reverified",
+            "dependencies_resolved",
+            "resolver_roots",
+            "source_date_epoch",
+            "resolve_argv_contract",
+            "argv_contract"
+          ],
+          "properties": {
+            "network_isolated": {
+              "const": true
+            },
+            "non_root": {
+              "const": true
+            },
+            "venv_without_pip": {
+              "const": true
+            },
+            "venv_read_only_at_runtime": {
+              "const": true
+            },
+            "runtime_environment_reverified": {
+              "const": true
+            },
+            "dependencies_resolved": {
+              "const": true
+            },
+            "resolver_roots": {
+              "const": [
+                "aws-cdk-cloud-assembly-schema",
+                "aws-cdk-lib",
+                "constructs",
+                "jsii"
+              ]
+            },
+            "source_date_epoch": {
+              "const": 0
+            },
+            "resolve_argv_contract": {
+              "const": [
+                "python",
+                "-I",
+                "-c",
+                "pinned-pip-wheel",
+                "--isolated",
+                "--disable-pip-version-check",
+                "install",
+                "--dry-run",
+                "--ignore-installed",
+                "--report",
+                "resolver-report",
+                "--no-input",
+                "--no-index",
+                "--find-links",
+                "wheelhouse",
+                "--only-binary=:all:",
+                "roots-exact"
+              ]
+            },
+            "argv_contract": {
+              "const": [
+                "python",
+                "-I",
+                "-c",
+                "pinned-pip-wheel",
+                "--isolated",
+                "--disable-pip-version-check",
+                "install",
+                "--no-input",
+                "--no-index",
+                "--find-links",
+                "wheelhouse",
+                "--require-hashes",
+                "--only-binary=:all:",
+                "-r",
+                "requirements-lock"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "supplyChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "installed_tree_sha256",
+        "toolchain_manifest_sha256"
+      ],
+      "properties": {
+        "contract": {
+          "$ref": "#/$defs/supplyChainContract"
+        },
+        "installed_tree_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "toolchain_manifest_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

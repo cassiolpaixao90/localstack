@@ -34,10 +34,8 @@ from localstack.services.apigateway.legacy.provider import (
     patch_api_gateway_entity,
 )
 from localstack.services.apigateway.patches import apply_patches
-from localstack.services.edge import ROUTER
 from localstack.services.moto import call_moto
 
-from ..models import apigateway_stores
 from .execute_api.gateway_response import (
     DEFAULT_GATEWAY_RESPONSES,
     GatewayResponseCode,
@@ -45,7 +43,7 @@ from .execute_api.gateway_response import (
     get_gateway_response_or_default,
 )
 from .execute_api.helpers import freeze_rest_api
-from .execute_api.router import ApiGatewayEndpoint, ApiGatewayRouter
+from .execute_api.router import ApiGatewayRouter, get_api_gateway_router
 from .execute_api.test_invoke import run_test_invocation
 
 
@@ -56,8 +54,7 @@ class ApigatewayNextGenProvider(ApigatewayProvider):
         # we initialize the route handler with a global store with default account and region, because it only ever
         # access values with CrossAccount attributes
         if not router:
-            route_handler = ApiGatewayEndpoint(store=apigateway_stores)
-            router = ApiGatewayRouter(ROUTER, handler=route_handler)
+            router = get_api_gateway_router()
 
         super().__init__(router=router)
 

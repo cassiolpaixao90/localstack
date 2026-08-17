@@ -1,4 +1,6 @@
+import base64
 import copy
+import hashlib
 import importlib.metadata
 import json
 import tarfile
@@ -26,6 +28,8 @@ APP_PATH = PROJECT_ROOT / "tests/aws/cli/fixtures/cdk_apps/python/minimal_sqs.py
 SCHEMA_PATH = PROJECT_ROOT / "capabilities/cdk/python-synth-execution-evidence.schema.json"
 COMMIT_SHA = "a" * 40
 RUN_ID = 123456
+RETAINED_RUN_ID = 31307734639
+RETAINED_EVIDENCE_DIR = PROJECT_ROOT / "capabilities/cdk/evidence/runs" / str(RETAINED_RUN_ID)
 
 
 def _schema_payload() -> bytes:
@@ -238,6 +242,92 @@ def test_python_synth_evidence_is_closed_content_addressed_and_not_promotional(t
         "blockers": list(PROMOTION_BLOCKERS),
     }
     assert "python-distribution-origin-not-attested" in evidence["promotion"]["blockers"]
+
+
+def test_retained_python_synth_candidate_is_content_addressed_and_attested():
+    from jsonschema.validators import validator_for
+    from tests.aws.cli.execution_evidence import read_regular_bounded
+
+    evidence_path = RETAINED_EVIDENCE_DIR / "cdk-python-synth-execution-evidence.json"
+    attestation_path = RETAINED_EVIDENCE_DIR / "cdk-python-synth-execution-evidence.sigstore.json"
+    assert set(RETAINED_EVIDENCE_DIR.iterdir()) == {evidence_path, attestation_path}
+
+    evidence_bytes = read_regular_bounded(evidence_path, MAX_EVIDENCE_BYTES)
+    attestation_bytes = read_regular_bounded(attestation_path, MAX_EVIDENCE_BYTES)
+    assert hashlib.sha256(evidence_bytes).hexdigest() == (
+        "cb13ec230cccba5fbacd2586d34f030bd36ab5631e717d9f12c011632ee279ba"
+    )
+    assert hashlib.sha256(attestation_bytes).hexdigest() == (
+        "6f3d8b0ab1891014a8ee9e699b37d4c639f4c30201298c7303cf3f1059339b58"
+    )
+
+    evidence = json.loads(evidence_bytes)
+    attestation = json.loads(attestation_bytes)
+    schema = json.loads(SCHEMA_PATH.read_bytes())
+    validator = validator_for(schema)
+    validator.check_schema(schema)
+    validator(schema, format_checker=validator.FORMAT_CHECKER).validate(evidence)
+    validate_aggregate_evidence(evidence)
+
+    assert evidence["evidence_id"] == (
+        "sha256:30f760d363a2697e76e0f2e3bdee01f2a7eedcef8d9f656f1c715ca5e3ba8987"
+    )
+    assert evidence["claim_id"] == (
+        "sha256:cc491228ec1e8fa152edc8cbdfd8b28dd15f10b6d4a4804ce93c3de05eb57099"
+    )
+    assert evidence["subject"] == {
+        "repository": "cassiolpaixao90/localstack",
+        "commit_sha": "7d2ce5f636f87785262185bce42aa497d88ee50b",
+        "ref": "refs/heads/main",
+    }
+    assert evidence["run"] == {
+        "provider": "github-actions",
+        "workflow_path": ".github/workflows/cdk-cli-blackbox.yml",
+        "run_id": RETAINED_RUN_ID,
+        "run_attempt": 1,
+        "event": "push",
+    }
+    assert [lane["platform"]["id"] for lane in evidence["lanes"]] == [
+        "linux-amd64",
+        "linux-arm64",
+    ]
+    assert {lane["platform"]["python_version"] for lane in evidence["lanes"]} == {"3.13.14"}
+    assert evidence["promotion"] == {
+        "eligible": False,
+        "blockers": list(PROMOTION_BLOCKERS),
+    }
+
+    envelope = attestation["dsseEnvelope"]
+    assert len(envelope["signatures"]) == 1
+    assert len(attestation["verificationMaterial"]["tlogEntries"]) == 1
+    payload = base64.b64decode(envelope["payload"], validate=True)
+    assert len(payload) <= 16 * 1024
+    statement = json.loads(payload)
+    assert statement["subject"] == [
+        {
+            "name": evidence_path.name,
+            "digest": {"sha256": hashlib.sha256(evidence_bytes).hexdigest()},
+        }
+    ]
+    assert statement["predicateType"] == "https://slsa.dev/provenance/v1"
+    predicate = statement["predicate"]
+    definition = predicate["buildDefinition"]
+    assert definition["externalParameters"]["workflow"] == {
+        "ref": "refs/heads/main",
+        "repository": "https://github.com/cassiolpaixao90/localstack",
+        "path": ".github/workflows/cdk-cli-blackbox.yml",
+    }
+    assert definition["resolvedDependencies"] == [
+        {
+            "uri": "git+https://github.com/cassiolpaixao90/localstack@refs/heads/main",
+            "digest": {"gitCommit": evidence["subject"]["commit_sha"]},
+        }
+    ]
+    assert definition["internalParameters"]["github"]["event_name"] == "push"
+    assert definition["internalParameters"]["github"]["runner_environment"] == ("github-hosted")
+    assert predicate["runDetails"]["metadata"]["invocationId"] == (
+        f"https://github.com/cassiolpaixao90/localstack/actions/runs/{RETAINED_RUN_ID}/attempts/1"
+    )
 
 
 def test_observation_rejects_argv_or_schema_not_used_by_the_real_validator(tmp_path):

@@ -1,0 +1,81 @@
+{
+  "typeName": "AWS::Cognito::IdentityPool",
+  "description": "A native Cognito identity pool with fail-closed unsupported integrations.",
+  "additionalProperties": false,
+  "properties": {
+    "AllowClassicFlow": {"type": "boolean"},
+    "AllowUnauthenticatedIdentities": {"type": "boolean"},
+    "CognitoEvents": {"type": "object"},
+    "CognitoIdentityProviders": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ClientId": {"type": "string", "minLength": 1, "maxLength": 128},
+          "ProviderName": {"type": "string", "minLength": 1, "maxLength": 128},
+          "ServerSideTokenCheck": {"type": "boolean"}
+        }
+      }
+    },
+    "CognitoStreams": {"type": "object"},
+    "DeveloperProviderName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "IdentityPoolId": {"type": "string", "minLength": 1, "maxLength": 55},
+    "IdentityPoolName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_\\s+=,.@-]+$"
+    },
+    "IdentityPoolTags": {
+      "type": "array",
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["Key", "Value"],
+        "properties": {
+          "Key": {"type": "string", "minLength": 1, "maxLength": 128},
+          "Value": {"type": "string", "maxLength": 256}
+        }
+      }
+    },
+    "Name": {"type": "string"},
+    "OpenIdConnectProviderARNs": {
+      "type": "array",
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 20, "maxLength": 2048}
+    },
+    "PushSync": {"type": "object"},
+    "SamlProviderARNs": {
+      "type": "array",
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 20, "maxLength": 2048}
+    },
+    "SupportedLoginProviders": {
+      "type": "object",
+      "maxProperties": 50,
+      "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 128}
+    }
+  },
+  "required": ["AllowUnauthenticatedIdentities"],
+  "primaryIdentifier": ["/properties/IdentityPoolId"],
+  "readOnlyProperties": ["/properties/IdentityPoolId", "/properties/Name"],
+  "tagging": {"taggable": true, "tagOnCreate": true, "tagUpdatable": true},
+  "handlers": {
+    "create": {"permissions": ["cognito-identity:CreateIdentityPool"]},
+    "read": {"permissions": ["cognito-identity:DescribeIdentityPool"]},
+    "update": {"permissions": ["cognito-identity:UpdateIdentityPool"]},
+    "delete": {"permissions": ["cognito-identity:DeleteIdentityPool"]},
+    "list": {"permissions": ["cognito-identity:ListIdentityPools"]}
+  }
+}

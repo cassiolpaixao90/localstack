@@ -1,0 +1,161 @@
+{
+  "typeName": "AWS::Cognito::UserPoolClient",
+  "description": "A native Cognito user pool client with the currently supported LocalStack properties.",
+  "additionalProperties": false,
+  "properties": {
+    "AccessTokenValidity": {"type": "integer", "minimum": 1, "maximum": 86400},
+    "AllowedOAuthFlows": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {"type": "string", "enum": ["code", "implicit"]}
+    },
+    "AllowedOAuthFlowsUserPoolClient": {"type": "boolean"},
+    "AllowedOAuthScopes": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 256}
+    },
+    "AnalyticsConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ApplicationArn": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 2048,
+          "pattern": "^arn:[\\w+=/,.@-]+:[\\w+=/,.@-]+:([\\w+=/,.@-]*)?:[0-9]+:[\\w+=/,.@-]+(:[\\w+=/,.@-]+)?(:[\\w+=/,.@-]+)?$"
+        },
+        "ApplicationId": {"type": "string", "pattern": "^[0-9a-fA-F]+$"},
+        "ExternalId": {"type": "string", "maxLength": 131072},
+        "RoleArn": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 2048,
+          "pattern": "^arn:[\\w+=/,.@-]+:[\\w+=/,.@-]+:([\\w+=/,.@-]*)?:[0-9]+:[\\w+=/,.@-]+(:[\\w+=/,.@-]+)?(:[\\w+=/,.@-]+)?$"
+        },
+        "UserDataShared": {"type": "boolean"}
+      }
+    },
+    "AuthSessionValidity": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 15,
+      "default": 3
+    },
+    "CallbackURLs": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 1024}
+    },
+    "ClientId": {"type": "string"},
+    "ClientName": {"type": "string", "minLength": 1, "maxLength": 128},
+    "ClientSecret": {"type": "string"},
+    "DefaultRedirectURI": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "EnableTokenRevocation": {"type": "boolean"},
+    "EnablePropagateAdditionalUserContextData": {"type": "boolean"},
+    "ExplicitAuthFlows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 9,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "ADMIN_NO_SRP_AUTH",
+          "ALLOW_ADMIN_USER_PASSWORD_AUTH",
+          "ALLOW_CUSTOM_AUTH",
+          "ALLOW_REFRESH_TOKEN_AUTH",
+          "ALLOW_USER_AUTH",
+          "ALLOW_USER_PASSWORD_AUTH",
+          "ALLOW_USER_SRP_AUTH",
+          "CUSTOM_AUTH_FLOW_ONLY",
+          "USER_PASSWORD_AUTH"
+        ]
+      }
+    },
+    "GenerateSecret": {"type": "boolean"},
+    "IdTokenValidity": {"type": "integer", "minimum": 1, "maximum": 86400},
+    "LogoutURLs": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 1024}
+    },
+    "Name": {"type": "string"},
+    "PreventUserExistenceErrors": {
+      "type": "string",
+      "enum": ["ENABLED", "LEGACY"]
+    },
+    "ReadAttributes": {"$ref": "#/definitions/attributes"},
+    "RefreshTokenValidity": {"type": "integer", "minimum": 0, "maximum": 315360000},
+    "RefreshTokenRotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Feature": {"type": "string", "enum": ["ENABLED", "DISABLED"]},
+        "RetryGracePeriodSeconds": {"type": "integer", "minimum": 0, "maximum": 60}
+      },
+      "required": ["Feature"]
+    },
+    "SupportedIdentityProviders": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 60,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 40}
+    },
+    "TokenValidityUnits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "AccessToken": {"$ref": "#/definitions/validityUnit"},
+        "IdToken": {"$ref": "#/definitions/validityUnit"},
+        "RefreshToken": {"$ref": "#/definitions/validityUnit"}
+      }
+    },
+    "UserPoolId": {"type": "string", "minLength": 1},
+    "WriteAttributes": {"$ref": "#/definitions/attributes"}
+  },
+  "definitions": {
+    "attributes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 50,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 64}
+    },
+    "validityUnit": {
+      "type": "string",
+      "enum": ["seconds", "minutes", "hours", "days"]
+    }
+  },
+  "required": ["UserPoolId"],
+  "createOnlyProperties": [
+    "/properties/GenerateSecret",
+    "/properties/UserPoolId"
+  ],
+  "primaryIdentifier": [
+    "/properties/UserPoolId",
+    "/properties/ClientId"
+  ],
+  "readOnlyProperties": [
+    "/properties/ClientId",
+    "/properties/ClientSecret",
+    "/properties/Name"
+  ],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-idp:CreateUserPoolClient", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:GetRole", "iam:GetRolePolicy", "iam:ListAttachedRolePolicies", "iam:ListRolePolicies", "mobiletargeting:GetApp"]},
+    "read": {"permissions": ["cognito-idp:DescribeUserPoolClient"]},
+    "update": {"permissions": ["cognito-idp:DescribeUserPoolClient", "cognito-idp:UpdateUserPoolClient", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:GetRole", "iam:GetRolePolicy", "iam:ListAttachedRolePolicies", "iam:ListRolePolicies", "mobiletargeting:GetApp"]},
+    "delete": {"permissions": ["cognito-idp:DeleteUserPoolClient"]},
+    "list": {"permissions": ["cognito-idp:ListUserPoolClients"]}
+  }
+}

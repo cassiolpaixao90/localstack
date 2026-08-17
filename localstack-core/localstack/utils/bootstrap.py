@@ -446,12 +446,7 @@ def validate_localstack_config(name: str):
 
 
 def get_docker_image_to_start() -> str:
-    image_name = os.environ.get("IMAGE_NAME")
-    if not image_name:
-        image_name = constants.DOCKER_IMAGE_NAME
-        if is_auth_token_configured():
-            image_name = constants.DOCKER_IMAGE_NAME_PRO
-    return image_name
+    return os.environ.get("IMAGE_NAME") or constants.DOCKER_IMAGE_NAME
 
 
 def extract_port_flags(user_flags, port_mappings: PortMappings):

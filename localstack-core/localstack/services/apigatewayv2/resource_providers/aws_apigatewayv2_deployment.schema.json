@@ -1,0 +1,24 @@
+{
+  "typeName": "AWS::ApiGatewayV2::Deployment",
+  "description": "Native LocalStack HTTP API deployment subset",
+  "additionalProperties": false,
+  "primaryIdentifier": ["/properties/ApiId", "/properties/DeploymentId"],
+  "readOnlyProperties": ["/properties/AutoDeployed", "/properties/CreatedDate", "/properties/DeploymentId", "/properties/DeploymentStatus", "/properties/DeploymentStatusMessage"],
+  "createOnlyProperties": ["/properties/ApiId", "/properties/Description"],
+  "properties": {
+    "ApiId": {"type": "string"},
+    "AutoDeployed": {"type": "boolean"},
+    "CreatedDate": {"type": "string"},
+    "DeploymentId": {"type": "string"},
+    "DeploymentStatus": {"type": "string"},
+    "DeploymentStatusMessage": {"type": "string"},
+    "Description": {"type": "string"}
+  },
+  "required": ["ApiId"],
+  "handlers": {
+    "create": {"permissions": ["apigateway:POST"]},
+    "read": {"permissions": ["apigateway:GET"]},
+    "list": {"permissions": ["apigateway:GET"]},
+    "delete": {"permissions": ["apigateway:DELETE"]}
+  }
+}

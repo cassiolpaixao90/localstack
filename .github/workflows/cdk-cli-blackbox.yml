@@ -12,7 +12,7 @@ jobs:
   cdk-cli-blackbox:
     name: CDK CLI Black-box (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -42,6 +42,14 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-test.txt
 
+      - name: Download content-addressed Python synth wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=5s 120s \
+            python3 -I -S tests/aws/cli/python_synth_toolchain.py download \
+              --wheelhouse "$PWD/target/cdk-python-synth-wheelhouse-${{ matrix.arch }}"
+
       - name: Set up pinned Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -69,7 +77,7 @@ jobs:
           mkdir -p "$gate_root/home" "$gate_root/tmp"
 
           set +e
-          sudo timeout --signal=TERM --kill-after=10s 420s \
+          sudo timeout --signal=TERM --kill-after=10s 600s \
             unshare --net --pid --fork --kill-child=KILL --mount-proc -- \
               "$PWD/scripts/run_cdk_cli_blackbox_isolated.sh" enter \
               "$sandbox_uid" \
@@ -93,7 +101,7 @@ jobs:
 
       - name: Verify exact JUnit result
         run: >-
-          python3 tests/aws/cli/validate_junit.py
+          python3 -I -S tests/aws/cli/validate_junit.py
           "target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-cli-${{ matrix.arch }}.xml"
 
       - name: Build bootstrap upgrade lane receipt
@@ -115,7 +123,7 @@ jobs:
 
       - name: Build Python synth lane receipt
         run: >-
-          python3 tests/aws/cli/python_synth_execution_evidence.py lane
+          python3 -I -S tests/aws/cli/python_synth_execution_evidence_v2.py lane
           --observation target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-python-synth-observation-${{ matrix.arch }}.json
           --junit target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-python-synth-${{ matrix.arch }}.xml
           --assembly-output target/cdk-cli-blackbox-${{ matrix.arch }}/cdk-python-synth-assembly-${{ matrix.arch }}
@@ -164,6 +172,15 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Archive API Gateway deploy diagnostic
+        if: success() || failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: diagnostic-cdk-apigateway-${{ matrix.arch }}
+          path: target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-apigateway-${{ matrix.arch }}.xml
+          if-no-files-found: error
+          retention-days: 30
+
   cdk-cli-blackbox-complete:
     name: CDK CLI Black-box (matrix complete)
     if: always()
@@ -204,7 +221,7 @@ jobs:
           test "${#reports[@]}" -eq 2
           test "${reports[0]}" = target/cdk-cli-results/test-results-cdk-cli-amd64/pytest-junit-cdk-cli-amd64.xml
           test "${reports[1]}" = target/cdk-cli-results/test-results-cdk-cli-arm64/pytest-junit-cdk-cli-arm64.xml
-          python3 tests/aws/cli/validate_junit.py "${reports[@]}"
+          python3 -I -S tests/aws/cli/validate_junit.py "${reports[@]}"
 
       - name: Build content-addressed candidate evidence
         run: >-
@@ -263,7 +280,7 @@ jobs:
           test "${downloaded[3]}" = target/cdk-bootstrap-upgrade-results/test-results-cdk-bootstrap-upgrade-arm64/pytest-junit-cdk-bootstrap-upgrade-arm64.xml
           mapfile -t reports < <(find target/cdk-bootstrap-upgrade-results -type f -name 'pytest-junit-cdk-bootstrap-upgrade-*.xml' | LC_ALL=C sort)
           test "${#reports[@]}" -eq 2
-          python3 tests/aws/cli/validate_junit.py --scenario bootstrap-upgrade-v28-v32 "${reports[@]}"
+          python3 -I -S tests/aws/cli/validate_junit.py --scenario bootstrap-upgrade-v28-v32 "${reports[@]}"
 
       - name: Build bootstrap upgrade candidate evidence
         run: >-
@@ -324,11 +341,11 @@ jobs:
           test "${downloaded[3]}" = target/cdk-python-synth-results/test-results-cdk-python-synth-arm64/pytest-junit-cdk-python-synth-arm64.xml
           mapfile -t reports < <(find target/cdk-python-synth-results -type f -name 'pytest-junit-cdk-python-synth-*.xml' | LC_ALL=C sort)
           test "${#reports[@]}" -eq 2
-          python3 tests/aws/cli/validate_junit.py --scenario synth-python-minimal-sqs-v1 "${reports[@]}"
+          python3 -I -S tests/aws/cli/validate_junit.py --scenario synth-python-minimal-sqs-v1 "${reports[@]}"
 
       - name: Build Python synth candidate evidence
         run: >-
-          python3 tests/aws/cli/python_synth_execution_evidence.py aggregate
+          python3 -I -S tests/aws/cli/python_synth_execution_evidence_v2.py aggregate
           --receipt-amd64 target/cdk-python-synth-results/test-results-cdk-python-synth-amd64/cdk-python-synth-execution-receipt-amd64.json
           --receipt-arm64 target/cdk-python-synth-results/test-results-cdk-python-synth-arm64/cdk-python-synth-execution-receipt-arm64.json
           --junit-amd64 target/cdk-python-synth-results/test-results-cdk-python-synth-amd64/pytest-junit-cdk-python-synth-amd64.xml

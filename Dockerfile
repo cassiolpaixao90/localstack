@@ -94,7 +94,7 @@ RUN --mount=type=cache,target=/root/.cache \
 
 
 #
-# builder: Stage which installs the dependencies of LocalStack Community
+# builder: Stage which installs the dependencies of the unified LocalStack image
 #
 FROM base AS builder
 ARG TARGETARCH
@@ -126,7 +126,7 @@ RUN --mount=type=cache,target=/root/.cache\
 FROM base
 COPY --from=builder /opt/code/localstack/.venv /opt/code/localstack/.venv
 # The build version is set in the docker-helper.sh script to be the output of setuptools_scm
-ARG LOCALSTACK_BUILD_VERSION
+ARG LOCALSTACK_BUILD_VERSION=0.0.0.dev0
 
 # add project files necessary to install all dependencies
 ADD Makefile pyproject.toml plux.ini ./
@@ -136,7 +136,7 @@ ADD bin/localstack-supervisor bin/
 # add the code as late as possible
 ADD localstack-core/ /opt/code/localstack/localstack-core
 
-# Install LocalStack Community and generate the version file while doing so
+# Install LocalStack Core and generate the version file while doing so
 RUN --mount=type=cache,target=/root/.cache \
     . .venv/bin/activate && \
     SETUPTOOLS_SCM_PRETEND_VERSION_FOR_LOCALSTACK_CORE=${LOCALSTACK_BUILD_VERSION} \
@@ -175,12 +175,13 @@ HEALTHCHECK --interval=10s --start-period=15s --retries=5 --timeout=10s CMD /opt
 # default volume directory
 VOLUME /var/lib/localstack
 
-# mark the image version
-RUN touch /usr/lib/localstack/.community-version
+# mark the single, plan-neutral image distribution
+RUN touch /usr/lib/localstack/.unified-version
 
 LABEL authors="LocalStack Contributors"
 LABEL maintainer="LocalStack Team (info@localstack.cloud)"
-LABEL description="LocalStack Docker image"
+LABEL description="Unified LocalStack Docker image"
+LABEL org.opencontainers.image.edition="unified"
 
 # Add the build date and git hash at last (changes everytime)
 ARG LOCALSTACK_BUILD_DATE

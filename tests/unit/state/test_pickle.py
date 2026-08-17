@@ -1,8 +1,19 @@
 from queue import PriorityQueue
+from threading import RLock
 
 import pytest
 
 from localstack.state import pickle
+
+
+def test_pickle_rlock_restores_as_fresh_unlocked_lock():
+    original = RLock()
+    original.acquire()
+    lock = pickle.loads(pickle.dumps(original))
+    original.release()
+
+    assert lock.acquire(blocking=False)
+    lock.release()
 
 
 def test_pickle_priority_queue():

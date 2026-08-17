@@ -46,6 +46,40 @@ case "$mode" in
     mount -t tmpfs -o mode=0755,nosuid,nodev tmpfs /run
     mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
     ip link set lo up
+
+    readonly synth_wheelhouse="$sandbox_workspace/target/cdk-python-synth-wheelhouse-$result_arch"
+    readonly synth_venv="$sandbox_gate_root/cdk-python-synth-venv"
+    readonly synth_manifest="$sandbox_gate_root/cdk-python-synth-toolchain-$result_arch.json"
+    timeout --signal=TERM --kill-after=5s 180s \
+      setpriv \
+        --reuid="$sandbox_uid" \
+        --regid="$sandbox_gid" \
+        --clear-groups \
+        --no-new-privs \
+        --inh-caps=-all \
+        --ambient-caps=-all \
+        --bounding-set=-all \
+        env -i \
+          HOME="$sandbox_gate_root/home" \
+          TMPDIR="$sandbox_gate_root/tmp" \
+          PATH="/usr/sbin:/usr/bin:/sbin:/bin" \
+          PYTHONNOUSERSITE=1 \
+          "$sandbox_workspace/.venv/bin/python" -I -S \
+            "$sandbox_workspace/tests/aws/cli/python_synth_toolchain.py" install \
+              --base-python "$sandbox_workspace/.venv/bin/python" \
+              --venv "$synth_venv" \
+              --wheelhouse "$synth_wheelhouse" \
+              --manifest "$synth_manifest" \
+              --expected-uid "$sandbox_uid"
+    chown -R 0:0 "$synth_venv"
+    chmod -R o+rX,o-w "$synth_venv"
+    chown 0:0 "$synth_manifest"
+    chmod 0444 "$synth_manifest"
+    mount --bind "$synth_venv" "$synth_venv"
+    mount -o remount,bind,ro,nosuid,nodev "$synth_venv"
+    mount --bind "$synth_manifest" "$synth_manifest"
+    mount -o remount,bind,ro,nosuid,nodev "$synth_manifest"
+
     exec setpriv \
       --reuid="$sandbox_uid" \
       --regid="$sandbox_gid" \
@@ -65,6 +99,8 @@ case "$mode" in
         CDK_BOOTSTRAP_UPGRADE_OBSERVATION="$sandbox_gate_root/cdk-bootstrap-upgrade-observation-$result_arch.json" \
         CDK_PYTHON_SYNTH_OBSERVATION="$sandbox_gate_root/cdk-python-synth-observation-$result_arch.json" \
         CDK_PYTHON_SYNTH_OUTPUT="$sandbox_gate_root/cdk-python-synth-assembly-$result_arch" \
+        CDK_PYTHON_SYNTH_PYTHON="$synth_venv/bin/python" \
+        CDK_PYTHON_SYNTH_TOOLCHAIN_MANIFEST="$synth_manifest" \
         CDK_EXPECTED_MACHINE_ARCH="$machine_arch" \
         CDK_EXPECTED_NODE_ARCH="$node_arch" \
         CDK_EVIDENCE_REPOSITORY="$repository" \
@@ -102,6 +138,10 @@ case "$mode" in
       echo "the CDK gate can write to the checked-out workspace" >&2
       exit 1
     fi
+    if [[ -w "$CDK_PYTHON_SYNTH_PYTHON" || -w "$CDK_PYTHON_SYNTH_TOOLCHAIN_MANIFEST" ]]; then
+      echo "the Python synth toolchain remains writable" >&2
+      exit 1
+    fi
     if [[ -w /home/runner/work/_temp/_runner_file_commands ]]; then
       echo "the CDK gate can write GitHub Actions file commands" >&2
       exit 1
@@ -133,20 +173,26 @@ case "$mode" in
     .venv/bin/python -m pytest -q \
       --junitxml="$GATE_ROOT/pytest-junit-cdk-cli-$RESULT_ARCH.xml" \
       tests/aws/cli/test_cdk_cli_blackbox.py::test_cdk_cli_bootstrap_show_template_matches_pinned_v32
-    .venv/bin/python tests/aws/cli/validate_junit.py \
+    .venv/bin/python -I -S tests/aws/cli/validate_junit.py \
       "$GATE_ROOT/pytest-junit-cdk-cli-$RESULT_ARCH.xml"
     .venv/bin/python -m pytest -q \
       --junitxml="$GATE_ROOT/pytest-junit-cdk-bootstrap-upgrade-$RESULT_ARCH.xml" \
       tests/aws/cli/test_cdk_cli_bootstrap_upgrade.py::test_cdk_cli_upgrades_api_v28_to_builtin_v32
-    .venv/bin/python tests/aws/cli/validate_junit.py \
+    .venv/bin/python -I -S tests/aws/cli/validate_junit.py \
       --scenario bootstrap-upgrade-v28-v32 \
       "$GATE_ROOT/pytest-junit-cdk-bootstrap-upgrade-$RESULT_ARCH.xml"
     .venv/bin/python -m pytest -q \
       --junitxml="$GATE_ROOT/pytest-junit-cdk-python-synth-$RESULT_ARCH.xml" \
       tests/aws/cli/test_cdk_cli_python_synth.py::test_cdk_cli_synthesizes_minimal_python_sqs_app
-    .venv/bin/python tests/aws/cli/validate_junit.py \
+    .venv/bin/python -I -S tests/aws/cli/validate_junit.py \
       --scenario synth-python-minimal-sqs-v1 \
       "$GATE_ROOT/pytest-junit-cdk-python-synth-$RESULT_ARCH.xml"
+    .venv/bin/python -m pytest -q \
+      --junitxml="$GATE_ROOT/pytest-junit-cdk-apigateway-$RESULT_ARCH.xml" \
+      tests/aws/cli/test_cdk_cli_apigateway_deploy.py::test_cdk_cli_deploys_invokes_and_cleans_up_enterprise_apigateway
+    .venv/bin/python -I -S tests/aws/cli/validate_junit.py \
+      --scenario deploy-python-apigateway-mock-v1 \
+      "$GATE_ROOT/pytest-junit-cdk-apigateway-$RESULT_ARCH.xml"
     ;;
   *)
     echo "usage: $0 {enter|run}" >&2

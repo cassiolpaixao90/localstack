@@ -407,6 +407,9 @@ def scan_providers(
 _SERVICE_DIRECTORY_ALIASES = {
     "certificatemanager": "acm",
     "configservice": "config",
+    "cognito_identity": "cognito-identity",
+    "cognito_idp": "cognito-idp",
+    "cognito_sync": "cognito-sync",
     "kinesisfirehose": "firehose",
     "lambda_": "lambda",
     "resource_groups": "resource-groups",
@@ -460,12 +463,13 @@ def _classify_operation(
     generated_api: GeneratedApiRecord | None,
     provider: ProviderRecord | None,
 ) -> tuple[str, str, list[str], HandlerRecord | None]:
-    if generated_api is None or operation not in generated_api.operations:
+    handler = provider.handlers.get(operation) if provider else None
+    generated_operation = generated_api is not None and operation in generated_api.operations
+    if not generated_operation and handler is None:
         return "missing", "none", ["generated_api_missing"], None
     if provider is None:
         return "scaffold", "generated-stub", ["provider_missing"], None
 
-    handler = provider.handlers.get(operation)
     if handler is None or handler.unconditional_notimplemented:
         reasons = ["generated_or_unconditional_stub"]
         if provider.fallback:
@@ -482,6 +486,8 @@ def _classify_operation(
         )
 
     reasons = ["native_handler_requires_runtime_evidence"]
+    if not generated_operation:
+        reasons.append("manual_handler_without_generated_interface")
     if handler.conditional_notimplemented:
         reasons.append("conditional_notimplemented")
     if provider.fallback:

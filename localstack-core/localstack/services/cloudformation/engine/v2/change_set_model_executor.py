@@ -11,6 +11,7 @@ from typing import Final, Protocol, TypeVar
 from localstack import config
 from localstack.aws.api.cloudformation import (
     ChangeAction,
+    ChangeSetType,
     Output,
     ResourceStatus,
     StackStatus,
@@ -47,6 +48,7 @@ from localstack.services.cloudformation.resource_provider import (
     ProgressEvent,
     ResourceProviderExecutor,
     ResourceProviderPayload,
+    stack_tags_to_map,
 )
 from localstack.services.cloudformation.v2.entities import ChangeSet, ResolvedResource
 
@@ -59,12 +61,37 @@ REGEX_OUTPUT_APIGATEWAY = re.compile(
 )
 
 _T = TypeVar("_T")
+_PHYSICAL_ID_UNSET = object()
+
+
+def _inject_single_primary_identifier(
+    payload: ResourceProviderPayload, resource_provider, physical_resource_id: str | None
+) -> None:
+    """Restore a generated top-level primary identifier for update/delete payloads."""
+    if not physical_resource_id:
+        return
+    identifiers = getattr(resource_provider, "SCHEMA", {}).get("primaryIdentifier", [])
+    if len(identifiers) != 1:
+        return
+    pointer = identifiers[0]
+    prefix = "/properties/"
+    if not isinstance(pointer, str) or not pointer.startswith(prefix):
+        return
+    encoded_property = pointer[len(prefix) :]
+    if not encoded_property or "/" in encoded_property:
+        return
+    property_name = encoded_property.replace("~1", "/").replace("~0", "~")
+    request_data = payload["requestData"]
+    request_data["resourceProperties"].setdefault(property_name, physical_resource_id)
+    if (previous := request_data.get("previousResourceProperties")) is not None:
+        previous.setdefault(property_name, physical_resource_id)
 
 
 @dataclass
 class ChangeSetModelExecutorResult:
     resources: dict[str, ResolvedResource]
     outputs: list[Output]
+    failed: bool = False
     failure_message: str | None = None
 
 
@@ -106,38 +133,76 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
 
     def execute(self) -> ChangeSetModelExecutorResult:
         # constructive process
+        is_deletion = self._change_set.stack.status == StackStatus.DELETE_IN_PROGRESS
+        failed = False
         failure_message = None
         try:
             self.process()
         except TriggerRollback as e:
-            failure_message = e.reason
+            failed = True
+            failure_message = e.reason or f"Resource {e.logical_resource_id} failed without a reason"
         except Exception as e:
-            failure_message = str(e)
+            failed = True
+            failure_message = str(e) or type(e).__name__
 
-        is_deletion = self._change_set.stack.status == StackStatus.DELETE_IN_PROGRESS
-        if self._deferred_actions:
+        is_update = self._change_set.change_set_type == ChangeSetType.UPDATE
+        if failed and not is_deletion:
+            self._change_set.stack.set_stack_status(
+                StackStatus.UPDATE_ROLLBACK_IN_PROGRESS
+                if is_update
+                else StackStatus.ROLLBACK_IN_PROGRESS
+            )
+
+        # Deferred actions are forward cleanups, such as deleting an old resource after a
+        # replacement. Running them after failure would destroy the rollback baseline.
+        if self._deferred_actions and not failed:
             if not is_deletion:
-                # TODO: correct status
-                # TODO: differentiate between update and create
                 self._change_set.stack.set_stack_status(
-                    StackStatus.ROLLBACK_IN_PROGRESS
-                    if failure_message
-                    else StackStatus.UPDATE_COMPLETE_CLEANUP_IN_PROGRESS
+                    StackStatus.UPDATE_COMPLETE_CLEANUP_IN_PROGRESS
                 )
-
             # perform all deferred actions such as deletions. These must happen in reverse from their
             # defined order so that resource dependencies are honoured
-            # TODO: errors will stop all rollbacks; get parity on this behaviour
             for deferred in self._deferred_actions[::-1]:
                 LOG.debug("executing deferred action: '%s'", deferred.name)
-                deferred.action()
+                try:
+                    deferred.action()
+                except TriggerRollback as e:
+                    failed = True
+                    failure_message = (
+                        e.reason or f"Resource {e.logical_resource_id} failed without a reason"
+                    )
+                    if not is_deletion:
+                        self._change_set.stack.set_stack_status(
+                            StackStatus.UPDATE_ROLLBACK_IN_PROGRESS
+                            if is_update
+                            else StackStatus.ROLLBACK_IN_PROGRESS
+                        )
+                    break
+                except Exception as e:
+                    failed = True
+                    failure_message = str(e) or type(e).__name__
+                    if not is_deletion:
+                        self._change_set.stack.set_stack_status(
+                            StackStatus.UPDATE_ROLLBACK_IN_PROGRESS
+                            if is_update
+                            else StackStatus.ROLLBACK_IN_PROGRESS
+                        )
+                    break
 
-        if failure_message and not is_deletion:
-            # TODO: differentiate between update and create
-            self._change_set.stack.set_stack_status(StackStatus.ROLLBACK_COMPLETE)
+        if failed and not is_deletion:
+            # Cross-resource compensation is not implemented yet. Fail closed instead of claiming
+            # rollback completion while external mutations may remain.
+            self._change_set.stack.set_stack_status(
+                StackStatus.UPDATE_ROLLBACK_FAILED
+                if is_update
+                else StackStatus.ROLLBACK_FAILED
+            )
 
         return ChangeSetModelExecutorResult(
-            resources=self.resources, outputs=self.outputs, failure_message=failure_message
+            resources=self.resources,
+            outputs=self.outputs,
+            failed=failed,
+            failure_message=failure_message,
         )
 
     def _defer_action(self, name: str, action: DeferredAction):
@@ -171,6 +236,8 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
         special_action: str = None,
         reason: str = None,
         custom_status: ResourceStatus | str | None = None,
+        update_resource_state: bool = True,
+        physical_resource_id_override: str | None | object = _PHYSICAL_ID_UNSET,
     ):
         status_from_action = special_action or EventOperationFromAction[action.value]
 
@@ -183,17 +250,22 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
         if custom_status:
             status = ResourceStatus(custom_status)
 
-        physical_resource_id = self._get_physical_id(logical_resource_id, False)
+        physical_resource_id = (
+            self._get_physical_id(logical_resource_id, False)
+            if physical_resource_id_override is _PHYSICAL_ID_UNSET
+            else physical_resource_id_override
+        )
         self._change_set.stack.set_resource_status(
             logical_resource_id=logical_resource_id,
             physical_resource_id=physical_resource_id,
             resource_type=resource_type,
             status=status,
             resource_status_reason=reason,
+            update_resource_state=update_resource_state,
         )
 
         if event_status == OperationStatus.FAILED:
-            self._change_set.stack.set_stack_status(StackStatus(status))
+            raise TriggerRollback(logical_resource_id=logical_resource_id, reason=reason)
 
     def _after_deployed_property_value_of(
         self, resource_logical_id: str, property_name: str
@@ -353,6 +425,8 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                                 logical_resource_id=name,
                                 event_status=OperationStatus.IN_PROGRESS,
                                 resource_type=before.resource_type,
+                                update_resource_state=False,
+                                physical_resource_id_override=before.physical_resource_id,
                             )
                             event = self._execute_resource_action(
                                 action=ChangeAction.Remove,
@@ -361,6 +435,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                                 before_properties=before_properties,
                                 after_properties=None,
                                 part_of_replacement=True,
+                                physical_resource_id=before.physical_resource_id,
                             )
                             self._process_event(
                                 action=ChangeAction.Remove,
@@ -368,6 +443,8 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                                 event_status=event.status,
                                 resource_type=before.resource_type,
                                 reason=event.message,
+                                update_resource_state=False,
+                                physical_resource_id_override=before.physical_resource_id,
                             )
                         else:
                             self._process_event(
@@ -376,6 +453,8 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                                 event_status=OperationStatus.SUCCESS,
                                 resource_type=before.resource_type,
                                 custom_status=ResourceStatus.DELETE_SKIPPED,
+                                update_resource_state=False,
+                                physical_resource_id_override=before.physical_resource_id,
                             )
 
                     self._defer_action(f"cleanup-from-replacement-{name}", cleanup)
@@ -386,6 +465,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                         resource_type=before.resource_type,
                         before_properties=before_properties,
                         after_properties=after.properties,
+                        physical_resource_id=before.physical_resource_id,
                     )
                     self._process_event(
                         action=ChangeAction.Modify,
@@ -408,13 +488,17 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                         resource_type=before.resource_type,
                         before_properties=before_properties,
                         after_properties=None,
+                        part_of_replacement=True,
+                        physical_resource_id=before.physical_resource_id,
                     )
                     self._process_event(
-                        action=ChangeAction.Modify,
+                        action=ChangeAction.Remove,
                         logical_resource_id=name,
                         event_status=event.status,
                         resource_type=before.resource_type,
                         reason=event.message,
+                        update_resource_state=False,
+                        physical_resource_id_override=before.physical_resource_id,
                     )
 
                 self._defer_action(f"type-migration-{name}", perform_deletion)
@@ -430,7 +514,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                     action=ChangeAction.Modify,
                     logical_resource_id=name,
                     event_status=event.status,
-                    resource_type=before.resource_type,
+                    resource_type=after.resource_type,
                     reason=event.message,
                 )
         elif not is_nothing(before):
@@ -447,6 +531,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                         logical_resource_id=name,
                         resource_type=before.resource_type,
                         event_status=OperationStatus.IN_PROGRESS,
+                        physical_resource_id_override=before.physical_resource_id,
                     )
                     event = self._execute_resource_action(
                         action=ChangeAction.Remove,
@@ -454,6 +539,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                         resource_type=before.resource_type,
                         before_properties=before_properties,
                         after_properties=None,
+                        physical_resource_id=before.physical_resource_id,
                     )
 
                     self._process_event(
@@ -462,6 +548,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                         event_status=event.status,
                         resource_type=before.resource_type,
                         reason=event.message,
+                        physical_resource_id_override=before.physical_resource_id,
                     )
                 else:
                     self._process_event(
@@ -470,6 +557,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                         event_status=OperationStatus.SUCCESS,
                         resource_type=before.resource_type,
                         custom_status=ResourceStatus.DELETE_SKIPPED,
+                        physical_resource_id_override=before.physical_resource_id,
                     )
 
             self._defer_action(f"remove-{name}", perform_deletion)
@@ -515,6 +603,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
         before_properties: PreprocProperties | None,
         after_properties: PreprocProperties | None,
         part_of_replacement: bool = False,
+        physical_resource_id: str | None = None,
     ) -> ProgressEvent:
         LOG.debug("Executing resource action: %s for resource '%s'", action, logical_resource_id)
         payload = self.create_resource_provider_payload(
@@ -527,6 +616,12 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
         resource_provider = self.resource_provider_executor.try_load_resource_provider(
             resource_type
         )
+        if resource_provider is not None and action != ChangeAction.Add:
+            _inject_single_primary_identifier(
+                payload,
+                resource_provider,
+                physical_resource_id,
+            )
         track_resource_operation(action, resource_type, missing=resource_provider is not None)
 
         extra_resource_properties = {}
@@ -682,7 +777,7 @@ class ChangeSetModelExecutor(ChangeSetModelPreproc):
                 "providerCredentials": creds,
                 "systemTags": {},
                 "previousSystemTags": {},
-                "stackTags": {},
+                "stackTags": stack_tags_to_map(self._change_set.stack.tags),
                 "previousStackTags": {},
             },
         }

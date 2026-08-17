@@ -1,0 +1,77 @@
+{
+  "typeName": "AWS::Cognito::IdentityPoolRoleAttachment",
+  "description": "Role configuration for a Cognito identity pool.",
+  "additionalProperties": false,
+  "properties": {
+    "Id": {"type": "string"},
+    "IdentityPoolId": {"type": "string", "minLength": 1, "maxLength": 55},
+    "RoleMappings": {
+      "type": "object",
+      "maxProperties": 10,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "AmbiguousRoleResolution": {
+            "type": "string",
+            "enum": ["AuthenticatedRole", "Deny"]
+          },
+          "IdentityProvider": {"type": "string", "minLength": 1, "maxLength": 128},
+          "RulesConfiguration": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "Rules": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 25,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "Claim": {"type": "string", "minLength": 1, "maxLength": 64},
+                    "MatchType": {
+                      "type": "string",
+                      "enum": ["Equals", "Contains", "StartsWith", "NotEqual"]
+                    },
+                    "RoleARN": {"type": "string", "minLength": 20, "maxLength": 2048},
+                    "Value": {"type": "string", "minLength": 1, "maxLength": 128}
+                  },
+                  "required": ["Claim", "MatchType", "RoleARN", "Value"]
+                }
+              }
+            },
+            "required": ["Rules"]
+          },
+          "Type": {"type": "string", "enum": ["Token", "Rules"]}
+        },
+        "required": ["AmbiguousRoleResolution", "Type"]
+      }
+    },
+    "Roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authenticated": {"type": "string", "minLength": 1},
+        "unauthenticated": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "required": ["IdentityPoolId"],
+  "primaryIdentifier": ["/properties/IdentityPoolId"],
+  "createOnlyProperties": ["/properties/IdentityPoolId"],
+  "readOnlyProperties": ["/properties/Id"],
+  "tagging": {"taggable": false},
+  "handlers": {
+    "create": {"permissions": ["cognito-identity:SetIdentityPoolRoles"]},
+    "read": {"permissions": ["cognito-identity:GetIdentityPoolRoles"]},
+    "update": {"permissions": ["cognito-identity:SetIdentityPoolRoles"]},
+    "delete": {"permissions": ["cognito-identity:SetIdentityPoolRoles"]},
+    "list": {
+      "permissions": [
+        "cognito-identity:GetIdentityPoolRoles",
+        "cognito-identity:ListIdentityPools"
+      ]
+    }
+  }
+}
