@@ -33,19 +33,20 @@ Do not edit generated files manually. Static analysis never promotes an operatio
 to `native` or `parity-pass`; those states require runtime dispatch evidence and
 fresh differential validation against AWS.
 
-The native Cognito IDP foundation currently contributes 18 runtime-unverified
-`partial` candidates to the catalog; 104 of 122 operations remain explicitly
-`missing`. The first native Cognito Identity foundation contributes six
-runtime-unverified `partial` candidates and leaves 17 of 23 operations
-explicitly `missing`; Cognito Sync remains wholly missing. The
-foundation includes password auth, refresh/revoke, distinct ID/access signing
-keys, bounded public JWKS discovery, OAuth app-client configuration, prefix-domain
-control plane, and unpromoted CloudFormation providers for the full pinned
-Cognito L1 surface (sixteen `AWS::Cognito::*` types across the IDP and Identity
-pools). Identity currently includes only pool lifecycle and guest
-`GetId`; it does not issue credentials or integrate STS/IAM. Restart
-persistence has not been proven, and this is not an Amplify, Hosted UI,
-OAuth/OIDC protocol, SRP, MFA, CDK, or service-wide support claim.
+The native Cognito providers now register handler overrides for the full
+pinned operation surface: all 129 Cognito IDP operations, all 23 Cognito
+Identity operations, and all 17 Cognito Sync operations are classified as
+runtime-unverified `partial` candidates with `native-candidate` origin; none
+remain `missing`, and none are promoted to `native` or `parity-pass`, which
+still require runtime dispatch evidence and fresh AWS differential validation.
+The native providers carry no Moto fallback and no generated API interface in
+this checkout, so every candidate also records
+`manual_handler_without_generated_interface`. CloudFormation resource-provider
+records exist for fifteen IDP `AWS::Cognito::*` types and three Identity-pool
+types; Cognito Sync has none. These static counts describe provider presence
+only: they do not prove restart persistence, protocol conformance, or AWS
+parity for any operation, and this is not an Amplify, Hosted UI, OAuth/OIDC
+protocol, SRP, MFA, CDK, or service-wide support claim.
 
 Metrics mode now appends request dispatch origins to the local raw CSV. The
 existing Tinybird `tests_raw__v0` uploader does not ingest that new column; a

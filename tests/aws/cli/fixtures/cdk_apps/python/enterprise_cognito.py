@@ -30,6 +30,17 @@ def context_value(app: App, name: str, default: str | None = None) -> str:
     return value
 
 
+def password_minimum_length(app: App) -> int:
+    value = app.node.try_get_context("passwordMinimumLength")
+    if value is None:
+        return 8
+    if not isinstance(value, str) or not value.isdigit():
+        raise ValueError("CDK context 'passwordMinimumLength' must be a decimal integer")
+    # Deliberately not clamped to the Cognito 6..99 range: the lifecycle gate
+    # drives an out-of-range value to force a provider-rejected update.
+    return int(value)
+
+
 def required_environment(name: str) -> str:
     value = os.environ.get(name)
     if not value:
@@ -41,6 +52,7 @@ app = App()
 project = context_value(app, "project", "localstack-enterprise")
 stage = context_value(app, "stage", "dev")
 deployment = context_value(app, "deployment")
+minimum_length = password_minimum_length(app)
 account = required_environment("CDK_DEFAULT_ACCOUNT")
 region = required_environment("CDK_DEFAULT_REGION")
 prefix = f"{project}-{stage}-{deployment}"
@@ -71,7 +83,7 @@ for path, value in {
     "MfaConfiguration": "OPTIONAL",
     "Policies": {
         "PasswordPolicy": {
-            "MinimumLength": 8,
+            "MinimumLength": minimum_length,
             "RequireLowercase": True,
             "RequireNumbers": True,
             "RequireSymbols": True,
@@ -245,9 +257,7 @@ authenticated_role = aws_iam.CfnRole(
                     "ForAnyValue:StringEquals": {
                         "cognito-identity.amazonaws.com:amr": "authenticated"
                     },
-                    "StringEquals": {
-                        "cognito-identity.amazonaws.com:aud": identity_pool.ref
-                    },
+                    "StringEquals": {"cognito-identity.amazonaws.com:aud": identity_pool.ref},
                 },
                 "Effect": "Allow",
                 "Principal": {"Federated": "cognito-identity.amazonaws.com"},

@@ -377,6 +377,68 @@ def _python_app_command() -> str:
     return shlex.join((str(python), "-I", "-B", str(APP_PATH)))
 
 
+def _deploy_arguments(
+    *,
+    deployment: str,
+    owner_nonce: str,
+    output_path: Path,
+    extra_context: dict[str, str] | None = None,
+) -> list[str]:
+    arguments = [
+        "deploy",
+        "EnterpriseCognito",
+        "--app",
+        _python_app_command(),
+        "--context",
+        "project=localstack-enterprise",
+        "--context",
+        "stage=dev",
+        "--context",
+        f"deployment={deployment}",
+    ]
+    for name, value in (extra_context or {}).items():
+        arguments.extend(("--context", f"{name}={value}"))
+    arguments.extend(
+        [
+            "--tags",
+            f"{OWNER_TAG_KEY}={owner_nonce}",
+            "--outputs-file",
+            str(output_path),
+            "--require-approval",
+            "never",
+            "--no-lookups",
+            "--strict",
+            "--no-version-reporting",
+            "--no-path-metadata",
+            "--no-asset-metadata",
+            "--no-notices",
+            "--no-color",
+            "--ci",
+            "--execute",
+        ]
+    )
+    return arguments
+
+
+def _launch_deploy(
+    pinned_cdk_cli_runtime: CdkRuntime,
+    environment: dict[str, str],
+    arguments: list[str],
+):
+    result = launch_cdk(
+        arguments,
+        executable=pinned_cdk_cli_runtime.executable,
+        environment=environment,
+        cwd=pinned_cdk_cli_runtime.workspace,
+        timeout_seconds=90,
+        max_output_bytes=256 * 1024,
+    )
+    assert not result.timed_out
+    assert not result.stdout_truncated
+    assert not result.stderr_truncated
+    return result
+
+
 def _describe_stack(cloudformation, stack_name_or_id: str) -> dict | None:
     try:
         response = cloudformation.describe_stacks(StackName=stack_name_or_id)
@@ -669,43 +731,15 @@ def deployed_enterprise_cognito(
     owned_role_names: set[str] = set()
     try:
         deploy_attempted = True
-        result = launch_cdk(
-            [
-                "deploy",
-                "EnterpriseCognito",
-                "--app",
-                _python_app_command(),
-                "--context",
-                "project=localstack-enterprise",
-                "--context",
-                "stage=dev",
-                "--context",
-                f"deployment={deployment}",
-                "--tags",
-                f"{OWNER_TAG_KEY}={owner_nonce}",
-                "--outputs-file",
-                str(output_path),
-                "--require-approval",
-                "never",
-                "--no-lookups",
-                "--strict",
-                "--no-version-reporting",
-                "--no-path-metadata",
-                "--no-asset-metadata",
-                "--no-notices",
-                "--no-color",
-                "--ci",
-                "--execute",
-            ],
-            executable=pinned_cdk_cli_runtime.executable,
-            environment=environment,
-            cwd=pinned_cdk_cli_runtime.workspace,
-            timeout_seconds=90,
-            max_output_bytes=256 * 1024,
+        result = _launch_deploy(
+            pinned_cdk_cli_runtime,
+            environment,
+            _deploy_arguments(
+                deployment=deployment,
+                owner_nonce=owner_nonce,
+                output_path=output_path,
+            ),
         )
-        assert not result.timed_out
-        assert not result.stdout_truncated
-        assert not result.stderr_truncated
         assert result.returncode == 0, result.stderr.decode(errors="replace")
         outputs = _load_outputs(
             output_path,
@@ -1118,10 +1152,13 @@ def test_cdk_cli_deploys_and_cleans_up_diagnostic_cognito(
         user_attributes = {
             attribute["Name"]: attribute["Value"] for attribute in user["UserAttributes"]
         }
-        assert user_attributes.items() >= {
-            "email": username,
-            "custom:tenantId": "diagnostic",
-        }.items()
+        assert (
+            user_attributes.items()
+            >= {
+                "email": username,
+                "custom:tenantId": "diagnostic",
+            }.items()
+        )
 
         _ensure_deadline(deadline)
         memberships = bounded_clients.cognito_idp.admin_list_groups_for_user(
@@ -1172,3 +1209,156 @@ def test_cdk_cli_deploys_and_cleans_up_diagnostic_cognito(
         f"assumed-role/{role_name}/{session_name}"
     )
     assert caller["UserId"].endswith(f":{session_name}")
+
+
+@markers.aws.only_localstack
+def test_cdk_cli_cognito_update_noop_rollback_lifecycle(
+    deployed_enterprise_cognito: CognitoDeployment,
+    pinned_cdk_cli_runtime: CdkRuntime,
+    aws_client_factory,
+    account_id,
+    region_name,
+    tmp_path,
+):
+    """Drive update, no-op, rollback, and recovery through the real CDK CLI.
+
+    The fixture covers deploy and the destroy leg: its teardown deletes the
+    stack and fails on any residual owned pool, identity pool, or IAM role.
+
+    Rollback note: the v2 CloudFormation engine fails closed on a rejected
+    update and parks the stack in UPDATE_ROLLBACK_FAILED instead of AWS's
+    UPDATE_ROLLBACK_COMPLETE (cross-resource compensation is not implemented
+    in the engine yet); the Cognito UserPool resource provider restores the
+    last-good pool configuration itself. This test pins the fail-closed
+    status, verifies the previous working state at the resource level, and
+    then proves the stack recovers with a follow-up good update.
+    """
+    deployment = deployed_enterprise_cognito
+    environment = dict(pinned_cdk_cli_runtime.environment)
+    environment.update(
+        {
+            "CDK_DEFAULT_ACCOUNT": account_id,
+            "CDK_DEFAULT_REGION": region_name,
+        }
+    )
+    bounded_clients = aws_client_factory(config=_rpc_client_config())
+    cloudformation = bounded_clients.cloudformation
+    cognito_idp = bounded_clients.cognito_idp
+    owner_deployment = _deployment_from_owner_nonce(deployment.owner_nonce)
+    resource_server_id = f"localstack-enterprise-dev-{owner_deployment}-api"
+    deadline = time.monotonic() + LIST_DEADLINE_SECONDS
+
+    def _deploy(extra_context: dict[str, str], output_path: Path):
+        return _launch_deploy(
+            pinned_cdk_cli_runtime,
+            environment,
+            _deploy_arguments(
+                deployment=owner_deployment,
+                owner_nonce=deployment.owner_nonce,
+                output_path=output_path,
+                extra_context=extra_context,
+            ),
+        )
+
+    def _owned_stack() -> dict:
+        _ensure_deadline(deadline)
+        stack = _describe_stack(cloudformation, deployment.stack_name)
+        if stack is None:
+            raise RuntimeError("deployed CloudFormation stack is missing")
+        _record_stack_id(
+            deployment.stack_id,
+            _validate_owned_stack(
+                stack,
+                stack_name=deployment.stack_name,
+                owner_nonce=deployment.owner_nonce,
+                account_id=account_id,
+                region_name=region_name,
+                require_create_complete=False,
+            ),
+        )
+        return stack
+
+    def _physical_ids() -> dict[str, str]:
+        _ensure_deadline(deadline)
+        resources = cloudformation.describe_stack_resources(StackName=deployment.stack_id).get(
+            "StackResources", []
+        )
+        return _validated_stack_resource_ids(
+            resources,
+            stack_id=deployment.stack_id,
+            expected_pool_id=deployment.pool_id,
+            expected_client_id=deployment.client_id,
+            expected_identity_pool_id=deployment.identity_pool_id,
+            expected_principal_tag_id=deployment.principal_tag_id,
+            expected_role_arn=deployment.authenticated_role_arn,
+            expected_resource_server_id=resource_server_id,
+        )
+
+    def _password_minimum_length() -> int:
+        _ensure_deadline(deadline)
+        pool = cognito_idp.describe_user_pool(UserPoolId=deployment.pool_id)["UserPool"]
+        return pool["Policies"]["PasswordPolicy"]["MinimumLength"]
+
+    baseline_ids = _physical_ids()
+    assert _owned_stack()["StackStatus"] == "CREATE_COMPLETE"
+    assert _password_minimum_length() == 8
+
+    update_output_path = tmp_path / "cognito-outputs-update.json"
+    update = _deploy({"passwordMinimumLength": "10"}, update_output_path)
+    assert update.returncode == 0, update.stderr.decode(errors="replace")
+    deadline = time.monotonic() + LIST_DEADLINE_SECONDS
+    update_outputs = _load_outputs(
+        update_output_path,
+        stack_name=deployment.stack_name,
+        account_id=account_id,
+        region_name=region_name,
+    )
+    assert update_outputs["UserPoolId"] == deployment.pool_id
+    assert update_outputs["UserPoolClientId"] == deployment.client_id
+    assert update_outputs["IdentityPoolId"] == deployment.identity_pool_id
+    assert update_outputs["IdentityPoolPrincipalTagId"] == deployment.principal_tag_id
+    assert update_outputs["AuthenticatedRoleArn"] == deployment.authenticated_role_arn
+    updated_stack = _owned_stack()
+    assert updated_stack["StackStatus"] == "UPDATE_COMPLETE"
+    assert _physical_ids() == baseline_ids
+    assert _password_minimum_length() == 10
+
+    noop_output_path = tmp_path / "cognito-outputs-noop.json"
+    noop = _deploy({"passwordMinimumLength": "10"}, noop_output_path)
+    assert noop.returncode == 0, noop.stderr.decode(errors="replace")
+    deadline = time.monotonic() + LIST_DEADLINE_SECONDS
+    noop_stack = _owned_stack()
+    assert noop_stack["StackStatus"] == "UPDATE_COMPLETE"
+    assert noop_stack.get("LastUpdatedTime") == updated_stack.get("LastUpdatedTime")
+    assert _physical_ids() == baseline_ids
+    assert _password_minimum_length() == 10
+
+    rollback_output_path = tmp_path / "cognito-outputs-rollback.json"
+    rollback = _deploy({"passwordMinimumLength": "4"}, rollback_output_path)
+    assert rollback.returncode != 0
+    deadline = time.monotonic() + LIST_DEADLINE_SECONDS
+    assert _owned_stack()["StackStatus"] == "UPDATE_ROLLBACK_FAILED"
+    assert _physical_ids() == baseline_ids
+    assert _password_minimum_length() == 10
+    assert not rollback_output_path.exists()
+    _ensure_deadline(deadline)
+    admin_user = cognito_idp.admin_get_user(
+        UserPoolId=deployment.pool_id,
+        Username=ADMIN_USERNAME,
+    )
+    assert admin_user["Username"] == ADMIN_USERNAME
+
+    recovery_output_path = tmp_path / "cognito-outputs-recovery.json"
+    recovery = _deploy({"passwordMinimumLength": "12"}, recovery_output_path)
+    assert recovery.returncode == 0, recovery.stderr.decode(errors="replace")
+    deadline = time.monotonic() + LIST_DEADLINE_SECONDS
+    recovery_outputs = _load_outputs(
+        recovery_output_path,
+        stack_name=deployment.stack_name,
+        account_id=account_id,
+        region_name=region_name,
+    )
+    assert recovery_outputs["UserPoolId"] == deployment.pool_id
+    assert _owned_stack()["StackStatus"] == "UPDATE_COMPLETE"
+    assert _physical_ids() == baseline_ids
+    assert _password_minimum_length() == 12
