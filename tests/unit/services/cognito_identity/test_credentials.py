@@ -18,6 +18,7 @@ from localstack.services.cognito_idp.models import cognito_idp_stores
 from localstack.services.cognito_idp.provider import CognitoIdpProvider
 from localstack.services.cognito_idp.tokens import sign_jwt
 from localstack.services.iam.iam_patches import apply_iam_patches
+from localstack.services.sts.credentials import resolve_session
 from localstack.services.sts.models import sts_stores
 from localstack.services.sts.provider import StsProvider
 from localstack.state import pickle
@@ -57,6 +58,7 @@ def _remove_account(context):
                 for pool_id in list(store.user_pools):
                     store.POOL_LOCATIONS.pop(pool_id, None)
             cognito_idp_stores.pop(context.account_id, None)
+    sts_stores.pop(context.account_id, None)
     iam_backends[context.account_id][context.partition].reset()
     sts_backends[context.account_id][context.partition].reset()
 
@@ -195,9 +197,13 @@ def test_guest_enhanced_flow_issues_unique_registered_temporary_credentials(prov
     assert first["Credentials"]["Expiration"] - datetime.now(UTC) <= timedelta(minutes=61)
 
     access_key = first["Credentials"]["AccessKeyId"]
-    user_id, caller_arn, account_id = sts_backends[context.account_id][
-        context.partition
-    ].get_caller_identity(access_key, context.region)
+    session = resolve_session(access_key, account_id=context.account_id)
+    assert session is not None
+    user_id, caller_arn, account_id = (
+        session.assumed_role_id,
+        session.assumed_role_arn,
+        session.account_id,
+    )
     assert account_id == context.account_id
     assert get_account_id_from_access_key_id(access_key) == context.account_id
     assert caller_arn.startswith(f"arn:{context.partition}:sts::{context.account_id}:assumed-role/")
@@ -307,10 +313,9 @@ def test_authenticated_identity_requires_valid_linked_logins_and_authenticated_r
         context,
         {**identity, "Logins": {provider_name: token}},
     )
-    _, caller_arn, _ = sts_backends[context.account_id][context.partition].get_caller_identity(
-        response["Credentials"]["AccessKeyId"], context.region
-    )
-    assert role_arn.rsplit("/", 1)[1] in caller_arn
+    session = resolve_session(response["Credentials"]["AccessKeyId"], account_id=context.account_id)
+    assert session is not None
+    assert role_arn.rsplit("/", 1)[1] in session.assumed_role_arn
 
 
 def test_principal_tag_map_derives_only_configured_verified_claims_for_sts(provider, context):
@@ -448,10 +453,11 @@ def test_token_role_mapping_preferred_and_custom_roles_reach_local_sts(provider,
         },
     )
     for response, selected in ((preferred, preferred_role), (custom, alternate_role)):
-        _, caller_arn, _ = sts_backends[context.account_id][context.partition].get_caller_identity(
-            response["Credentials"]["AccessKeyId"], context.region
+        session = resolve_session(
+            response["Credentials"]["AccessKeyId"], account_id=context.account_id
         )
-        assert selected.rsplit("/", 1)[1] in caller_arn
+        assert session is not None
+        assert selected.rsplit("/", 1)[1] in session.assumed_role_arn
 
     with pytest.raises(CommonServiceException) as arbitrary:
         provider.get_credentials_for_identity(
@@ -544,10 +550,11 @@ def test_rules_role_mapping_first_match_and_ambiguous_fallback(provider, context
         response = provider.get_credentials_for_identity(
             context, {**identity, "Logins": {provider_name: mapped_token}}
         )
-        _, caller_arn, _ = sts_backends[context.account_id][context.partition].get_caller_identity(
-            response["Credentials"]["AccessKeyId"], context.region
+        session = resolve_session(
+            response["Credentials"]["AccessKeyId"], account_id=context.account_id
         )
-        assert selected.rsplit("/", 1)[1] in caller_arn
+        assert session is not None
+        assert selected.rsplit("/", 1)[1] in session.assumed_role_arn
 
 
 def test_identity_ownership_state_and_guest_custom_role_fail_closed(provider, context):
@@ -623,12 +630,11 @@ def test_role_aba_is_detected_before_sts_issuance(provider, context, monkeypatch
     identity = provider.get_id(context, {"IdentityPoolId": pool["IdentityPoolId"]})
     from localstack.services.cognito_identity import credentials as credentials_module
 
-    original_token = credentials_module._internal_web_identity_token
+    original_issue = credentials_module.issue_role_session
     backend = iam_backends[context.account_id][context.partition]
     original_role = backend.get_role_by_arn(role_arn)
 
     def replace_role(**kwargs):
-        token = original_token(**kwargs)
         backend.delete_role(original_role.name)
         backend.create_role(
             role_name=original_role.name,
@@ -639,13 +645,14 @@ def test_role_aba_is_detected_before_sts_issuance(provider, context, monkeypatch
             tags=[],
             max_session_duration="3600",
         )
-        return token
+        return original_issue(**kwargs)
 
-    monkeypatch.setattr(credentials_module, "_internal_web_identity_token", replace_role)
+    monkeypatch.setattr(credentials_module, "issue_role_session", replace_role)
     with pytest.raises(CommonServiceException) as error:
         provider.get_credentials_for_identity(context, identity)
     assert error.value.code == "InvalidIdentityPoolConfigurationException"
     assert not sts_backends[context.account_id][context.partition].assumed_roles
+    assert not sts_stores[context.account_id][context.region].credential_sessions
 
 
 def test_identity_pool_delete_waits_for_issuance_then_revokes_session(
@@ -690,6 +697,7 @@ def test_identity_pool_delete_waits_for_issuance_then_revokes_session(
     access_key = credentials["Credentials"]["AccessKeyId"]
     assert deleted.is_set()
     assert access_key not in iam_backends[context.account_id][context.partition].access_keys
+    assert resolve_session(access_key, account_id=context.account_id) is None
     with cognito_identity_stores.lock:
         store = cognito_identity_stores[context.account_id][context.region]
         assert not store.credential_sessions
@@ -716,6 +724,7 @@ def test_session_cap_gc_revocation_and_raw_persistence(provider, context, monkey
     second = provider.get_credentials_for_identity(context, identity)
     assert second["Credentials"]["AccessKeyId"] != first_key
     assert first_key not in iam_backends[context.account_id][context.partition].access_keys
+    assert resolve_session(first_key, account_id=context.account_id) is None
 
     with cognito_identity_stores.lock:
         restored = pickle.loads(pickle.dumps(cognito_identity_stores))

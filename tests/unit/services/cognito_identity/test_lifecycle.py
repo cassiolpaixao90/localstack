@@ -20,6 +20,7 @@ from localstack.services.cognito_sync.models import (
     cognito_sync_stores,
 )
 from localstack.services.iam.iam_patches import apply_iam_patches
+from localstack.services.sts.credentials import resolve_session
 from localstack.state import pickle
 
 
@@ -444,7 +445,7 @@ def test_unlink_last_login_is_atomic_when_guest_access_is_disabled(provider, con
             == identity_id
         )
         assert access_key in store.credential_sessions
-    assert access_key in iam_backends[context.account_id][context.partition].access_keys
+    assert resolve_session(access_key, account_id=context.account_id) is not None
 
 
 def test_pool_tags_are_bounded_isolated_and_persistent(provider, context):

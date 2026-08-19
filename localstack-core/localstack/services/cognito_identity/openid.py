@@ -120,6 +120,18 @@ def issue_open_id_token(
     return token
 
 
+def decode_unverified_claims(token: str) -> dict[str, Any]:
+    """Decode token claims WITHOUT verifying the signature.
+
+    The result is only safe to use for routing decisions (e.g. locating the
+    signing key); callers MUST verify the token before trusting any claim.
+    """
+    if not isinstance(token, str) or not 1 <= len(token) <= _MAX_TOKEN_BYTES:
+        raise OpenIdTokenError("Invalid identity token")
+    _, claims_segment, _ = _segments(token)
+    return _json_segment(claims_segment)
+
+
 def verify_open_id_token(
     store: CognitoIdentityStore,
     *,
@@ -131,6 +143,34 @@ def verify_open_id_token(
     authenticated: bool,
     now: int | None = None,
 ) -> dict[str, Any]:
+    claims = verify_pool_open_id_token(
+        store,
+        token=token,
+        partition=partition,
+        region=region,
+        pool_id=pool_id,
+        now=now,
+    )
+    expected_method = "authenticated" if authenticated else "unauthenticated"
+    if claims["sub"] != identity_id or claims["amr"][0] != expected_method:
+        raise OpenIdTokenError("Invalid identity token claims")
+    return claims
+
+
+def verify_pool_open_id_token(
+    store: CognitoIdentityStore,
+    *,
+    token: str,
+    partition: str,
+    region: str,
+    pool_id: str,
+    now: int | None = None,
+) -> dict[str, Any]:
+    """Verify signature and claims of a pool token, deriving subject/amr from it.
+
+    Used by the STS AssumeRoleWithWebIdentity flow, where the identity is not
+    known ahead of time and is established by the token itself.
+    """
     if not isinstance(token, str) or not 1 <= len(token) <= _MAX_TOKEN_BYTES:
         raise OpenIdTokenError("Invalid identity token")
     header_segment, claims_segment, signature_segment = _segments(token)
@@ -164,8 +204,6 @@ def verify_open_id_token(
         claims,
         issuer=identity_issuer(partition, region),
         pool_id=pool_id,
-        identity_id=identity_id,
-        authenticated=authenticated,
         now=int(time.time()) if now is None else now,
     )
     return claims
@@ -176,8 +214,6 @@ def _validate_claims(
     *,
     issuer: str,
     pool_id: str,
-    identity_id: str,
-    authenticated: bool,
     now: int,
 ) -> None:
     required = {"amr", "aud", "exp", "iat", "iss", "jti", "sub"}
@@ -186,11 +222,11 @@ def _validate_claims(
     issued_at = claims.get("iat")
     expires_at = claims.get("exp")
     amr = claims.get("amr")
-    expected_method = "authenticated" if authenticated else "unauthenticated"
     if (
         claims.get("iss") != issuer
         or claims.get("aud") != pool_id
-        or claims.get("sub") != identity_id
+        or not isinstance(claims.get("sub"), str)
+        or not 1 <= len(claims["sub"]) <= 255
         or not _numeric_date(issued_at)
         or not _numeric_date(expires_at)
         or issued_at > now
@@ -199,18 +235,18 @@ def _validate_claims(
         or expires_at - issued_at > _MAX_TOKEN_DURATION
         or not isinstance(amr, list)
         or not amr
-        or amr[0] != expected_method
+        or amr[0] not in {"authenticated", "unauthenticated"}
         or len(amr) > 21
         or any(not isinstance(item, str) or not 1 <= len(item) <= 128 for item in amr)
         or len(set(amr)) != len(amr)
-        or (not authenticated and amr != ["unauthenticated"])
+        or (amr[0] == "unauthenticated" and amr != ["unauthenticated"])
         or not isinstance(claims.get("jti"), str)
         or not 16 <= len(claims["jti"]) <= 128
     ):
         raise OpenIdTokenError("Invalid identity token claims")
     principal_tags = claims.get("principal_tags")
     if principal_tags is not None and (
-        not authenticated
+        amr[0] != "authenticated"
         or not isinstance(principal_tags, dict)
         or not 1 <= len(principal_tags) <= 50
         or any(

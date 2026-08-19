@@ -48,6 +48,16 @@ only: they do not prove restart persistence, protocol conformance, or AWS
 parity for any operation, and this is not an Amplify, Hosted UI, OAuth/OIDC
 protocol, SRP, MFA, CDK, or service-wide support claim.
 
+A native STS session-issuance slice now backs Cognito Identity credentials:
+`AssumeRoleWithWebIdentity` and `GetCallerIdentity` have native handlers that
+verify OpenID tokens issued by local Cognito Identity pools (RS256 signature,
+issuer, audience, and trust-policy conditions) and register temporary sessions
+in the STS store, while the remaining nine STS operations still delegate to
+Moto. `GetCredentialsForIdentity` issues through the same native engine
+instead of the Moto STS backend. This slice is covered by unit and local
+integration tests only: it is not IAM policy enforcement, not an AWS
+differential validation, and not an STS service-wide claim.
+
 Metrics mode now appends request dispatch origins to the local raw CSV. The
 existing Tinybird `tests_raw__v0` uploader does not ingest that new column; a
 versioned remote schema and evidence importer are explicit Wave 0 follow-up.

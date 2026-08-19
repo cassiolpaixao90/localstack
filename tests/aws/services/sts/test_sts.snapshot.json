@@ -278,5 +278,126 @@
         }
       }
     }
+  },
+  "tests/aws/services/sts/test_sts.py::TestSTSIntegrations::test_assume_role_with_web_identity_cognito_identity_pool": {
+    "recorded-date": "19-08-2026, 23:48:05",
+    "recorded-content": {
+      "create-identity-pool": {
+        "AllowClassicFlow": true,
+        "AllowUnauthenticatedIdentities": true,
+        "IdentityPoolId": "<identity-pool-id:1>",
+        "IdentityPoolName": "<identity-pool-name:1>",
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "create-role": {
+        "Role": {
+          "Arn": "arn:<partition>:iam::111111111111:role/<resource:1>",
+          "AssumeRolePolicyDocument": {
+            "Statement": [
+              {
+                "Action": "sts:AssumeRoleWithWebIdentity",
+                "Condition": {
+                  "ForAnyValue:StringEquals": {
+                    "cognito-identity.amazonaws.com:amr": "unauthenticated"
+                  },
+                  "StringEquals": {
+                    "cognito-identity.amazonaws.com:aud": "<identity-pool-id:1>"
+                  }
+                },
+                "Effect": "Allow",
+                "Principal": {
+                  "Federated": "cognito-identity.amazonaws.com"
+                }
+              }
+            ],
+            "Version": "2012-10-17"
+          },
+          "CreateDate": "<datetime>",
+          "Path": "/",
+          "RoleId": "<role-id:1>",
+          "RoleName": "<resource:1>"
+        },
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "set-identity-pool-roles": {
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "get-id": {
+        "IdentityId": "<identity-id:1>",
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "get-open-id-token": {
+        "IdentityId": "<identity-id:1>",
+        "Token": "<token:1>",
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "assume-role-with-web-identity": {
+        "AssumedRoleUser": {
+          "Arn": "arn:<partition>:sts::111111111111:assumed-role/<resource:1>/<role-session-name>",
+          "AssumedRoleId": "<role-id:1>:<role-session-name>"
+        },
+        "Audience": "<identity-pool-id:1>",
+        "Credentials": {
+          "AccessKeyId": "<access-key-id:1>",
+          "Expiration": "<datetime>",
+          "SecretAccessKey": "<secret-access-key:1>",
+          "SessionToken": "<session-token:1>"
+        },
+        "Provider": "cognito-identity.amazonaws.com",
+        "SubjectFromWebIdentityToken": "<identity-id:1>",
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "get-caller-identity": {
+        "Account": "111111111111",
+        "Arn": "arn:<partition>:sts::111111111111:assumed-role/<resource:1>/<role-session-name>",
+        "UserId": "<role-id:1>:<role-session-name>",
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "get-credentials-for-identity": {
+        "Credentials": {
+          "AccessKeyId": "<access-key-id:2>",
+          "Expiration": "<datetime>",
+          "SecretKey": "<secret-key:1>",
+          "SessionToken": "<session-token:2>"
+        },
+        "IdentityId": "<identity-id:1>",
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 200
+        }
+      },
+      "invalid-web-identity-token": {
+        "Error": {
+          "Code": "InvalidIdentityToken",
+          "Message": "Invalid web identity token",
+          "Type": "Sender"
+        },
+        "ResponseMetadata": {
+          "HTTPHeaders": {},
+          "HTTPStatusCode": 400
+        }
+      }
+    }
   }
 }

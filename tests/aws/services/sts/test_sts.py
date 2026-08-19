@@ -158,21 +158,200 @@ class TestSTSIntegrations:
             assert assume_role_id_parts[1] == test_role_session_name
 
     @markers.aws.only_localstack
-    def test_assume_role_with_web_identity(self, aws_client):
+    def test_assume_role_with_web_identity_rejects_untrusted_token(self, aws_client):
         test_role_session_name = "web_token"
         test_role_arn = "arn:aws:sts::000000000000:role/rd_role"
         test_web_identity_token = "token"
-        response = aws_client.sts.assume_role_with_web_identity(
-            RoleArn=test_role_arn,
-            RoleSessionName=test_role_session_name,
-            WebIdentityToken=test_web_identity_token,
+        with pytest.raises(ClientError) as e:
+            aws_client.sts.assume_role_with_web_identity(
+                RoleArn=test_role_arn,
+                RoleSessionName=test_role_session_name,
+                WebIdentityToken=test_web_identity_token,
+            )
+        assert e.value.response["Error"]["Code"] == "InvalidIdentityToken"
+
+    @markers.aws.only_localstack
+    def test_assume_role_with_web_identity_native_cognito_flow(
+        self, aws_client, create_role, account_id, region_name
+    ):
+        pool = aws_client.cognito_identity.create_identity_pool(
+            IdentityPoolName=f"pool-{short_uid()}",
+            AllowUnauthenticatedIdentities=True,
+            AllowClassicFlow=True,
+        )
+        pool_id = pool["IdentityPoolId"]
+        try:
+            trust_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Principal": {"Federated": "cognito-identity.amazonaws.com"},
+                        "Condition": {
+                            "StringEquals": {"cognito-identity.amazonaws.com:aud": pool_id},
+                            "ForAnyValue:StringEquals": {
+                                "cognito-identity.amazonaws.com:amr": "unauthenticated"
+                            },
+                        },
+                    }
+                ],
+            }
+            role = create_role(
+                RoleName=f"role-{short_uid()}",
+                AssumeRolePolicyDocument=json.dumps(trust_policy),
+            )
+            role_arn = role["Role"]["Arn"]
+            aws_client.cognito_identity.set_identity_pool_roles(
+                IdentityPoolId=pool_id, Roles={"unauthenticated": role_arn}
+            )
+
+            identity_id = aws_client.cognito_identity.get_id(
+                AccountId=account_id, IdentityPoolId=pool_id
+            )["IdentityId"]
+            token = aws_client.cognito_identity.get_open_id_token(IdentityId=identity_id)["Token"]
+
+            session_name = f"session-{short_uid()}"
+            response = aws_client.sts.assume_role_with_web_identity(
+                RoleArn=role_arn,
+                RoleSessionName=session_name,
+                WebIdentityToken=token,
+            )
+            assert response["SubjectFromWebIdentityToken"] == identity_id
+            assert response["Audience"] == pool_id
+            assumed_role_arn = response["AssumedRoleUser"]["Arn"]
+            assert assumed_role_arn == (
+                f"arn:aws:sts::{account_id}:assumed-role/{role_arn.rsplit('/', 1)[-1]}/{session_name}"
+            )
+
+            session_client = create_client_with_keys(
+                "sts", response["Credentials"], region_name=region_name
+            )
+            caller = session_client.get_caller_identity()
+            assert caller["Arn"] == assumed_role_arn
+            assert caller["Account"] == account_id
+
+            credentials = aws_client.cognito_identity.get_credentials_for_identity(
+                IdentityId=identity_id
+            )["Credentials"]
+            enhanced_client = create_client_with_keys(
+                "sts",
+                {
+                    "AccessKeyId": credentials["AccessKeyId"],
+                    "SecretAccessKey": credentials["SecretKey"],
+                    "SessionToken": credentials["SessionToken"],
+                },
+                region_name=region_name,
+            )
+            enhanced_caller = enhanced_client.get_caller_identity()
+            assert enhanced_caller["Arn"].startswith(
+                f"arn:aws:sts::{account_id}:assumed-role/{role_arn.rsplit('/', 1)[-1]}/"
+            )
+            assert enhanced_caller["Account"] == account_id
+        finally:
+            aws_client.cognito_identity.delete_identity_pool(IdentityPoolId=pool_id)
+
+    @markers.aws.validated
+    def test_assume_role_with_web_identity_cognito_identity_pool(
+        self, aws_client, create_role, account_id, region_name, snapshot
+    ):
+        snapshot.add_transformers_list(
+            [
+                snapshot.transform.resource_name(),
+                snapshot.transform.key_value("RoleId"),
+                snapshot.transform.key_value("IdentityPoolId"),
+                snapshot.transform.key_value("IdentityPoolName"),
+                snapshot.transform.key_value("IdentityId"),
+                snapshot.transform.key_value("SubjectFromWebIdentityToken"),
+                snapshot.transform.key_value("Audience"),
+                snapshot.transform.key_value("Token"),
+                snapshot.transform.key_value("AccessKeyId"),
+                snapshot.transform.key_value("SecretAccessKey"),
+                snapshot.transform.key_value("SecretKey"),
+                snapshot.transform.key_value("SessionToken"),
+                snapshot.transform.key_value("UserId"),
+            ]
         )
 
-        assert response["Credentials"]
-        assert response["Credentials"]["SecretAccessKey"]
-        if response["AssumedRoleUser"]["AssumedRoleId"]:
-            assume_role_id_parts = response["AssumedRoleUser"]["AssumedRoleId"].split(":")
-            assert assume_role_id_parts[1] == test_role_session_name
+        pool = aws_client.cognito_identity.create_identity_pool(
+            IdentityPoolName=f"pool-{short_uid()}",
+            AllowUnauthenticatedIdentities=True,
+            AllowClassicFlow=True,
+        )
+        snapshot.match("create-identity-pool", pool)
+        pool_id = pool["IdentityPoolId"]
+        try:
+            trust_policy = {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": "sts:AssumeRoleWithWebIdentity",
+                        "Principal": {"Federated": "cognito-identity.amazonaws.com"},
+                        "Condition": {
+                            "StringEquals": {"cognito-identity.amazonaws.com:aud": pool_id},
+                            "ForAnyValue:StringEquals": {
+                                "cognito-identity.amazonaws.com:amr": "unauthenticated"
+                            },
+                        },
+                    }
+                ],
+            }
+            role = create_role(
+                RoleName=f"role-{short_uid()}",
+                AssumeRolePolicyDocument=json.dumps(trust_policy),
+            )
+            snapshot.match("create-role", role)
+            role_arn = role["Role"]["Arn"]
+            set_roles = aws_client.cognito_identity.set_identity_pool_roles(
+                IdentityPoolId=pool_id, Roles={"unauthenticated": role_arn}
+            )
+            snapshot.match("set-identity-pool-roles", set_roles)
+
+            identity = aws_client.cognito_identity.get_id(
+                AccountId=account_id, IdentityPoolId=pool_id
+            )
+            snapshot.match("get-id", identity)
+            identity_id = identity["IdentityId"]
+            open_id_token = aws_client.cognito_identity.get_open_id_token(IdentityId=identity_id)
+            snapshot.match("get-open-id-token", open_id_token)
+
+            session_name = f"session-{short_uid()}"
+            snapshot.add_transformer(
+                snapshot.transform.regex(session_name, "<role-session-name>"), priority=-1
+            )
+
+            def _assume_role_with_web_identity():
+                return aws_client.sts.assume_role_with_web_identity(
+                    RoleArn=role_arn,
+                    RoleSessionName=session_name,
+                    WebIdentityToken=open_id_token["Token"],
+                )
+
+            # the IAM trust policy can take a moment to propagate on AWS
+            response = retry(_assume_role_with_web_identity, sleep=5, retries=10)
+            snapshot.match("assume-role-with-web-identity", response)
+
+            session_client = create_client_with_keys(
+                "sts", response["Credentials"], region_name=region_name
+            )
+            caller = session_client.get_caller_identity()
+            snapshot.match("get-caller-identity", caller)
+
+            credentials = aws_client.cognito_identity.get_credentials_for_identity(
+                IdentityId=identity_id
+            )
+            snapshot.match("get-credentials-for-identity", credentials)
+
+            with pytest.raises(ClientError) as e:
+                aws_client.sts.assume_role_with_web_identity(
+                    RoleArn=role_arn,
+                    RoleSessionName=session_name,
+                    WebIdentityToken="token",
+                )
+            snapshot.match("invalid-web-identity-token", e.value.response)
+        finally:
+            aws_client.cognito_identity.delete_identity_pool(IdentityPoolId=pool_id)
 
     @markers.aws.only_localstack
     def test_assume_role_with_saml(self, aws_client):
