@@ -3,6 +3,13 @@
 This is not iOS Simulator or Amplify UI evidence. Package resolution/build is
 allowed to populate SwiftPM's external cache; the executable itself runs with
 network access restricted to the test-owned loopback endpoints.
+
+Host requirement: the harness binary carries a test-owned
+keychain-access-groups entitlement. macOS 26 (amfid error -424) kills ad-hoc
+signed binaries with restricted entitlements at launch, and the Amplify
+keychain store cannot run without the entitlement, so this gate skips unless
+the host accepts the ad-hoc restricted signature (older macOS) or a properly
+provisioned signing identity is wired into the build.
 """
 
 import concurrent.futures
@@ -329,11 +336,14 @@ def _tls_relay(destination_port: int):
         return _DockerTcpRelay(destination_port)
 
 
-def _bounded_run(command: list[str], *, cwd: Path, env: dict[str, str], timeout: int, limit: int):
+def _bounded_run(
+    command: list[str], *, cwd: Path, env: dict[str, str], timeout: int, limit: int, stdin=None
+):
     process = subprocess.Popen(
         command,
         cwd=cwd,
         env=env,
+        stdin=stdin,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         start_new_session=True,
@@ -645,6 +655,23 @@ let package = Package(
     )
     if signed.returncode:
         raise AssertionError(f"Amplify Swift ad-hoc signing failed: {signed.stderr.decode()}")
+    # macOS 26 kills ad-hoc signed binaries carrying restricted entitlements at
+    # launch (amfid error -424), and the Amplify keychain store cannot operate
+    # without keychain-access-groups. Probe a launch and skip explicitly when
+    # the host rejects the signature instead of failing opaquely at runtime.
+    probe = _bounded_run(
+        [str(binary)],
+        cwd=work,
+        env=environment,
+        timeout=30,
+        limit=64 * 1024,
+        stdin=subprocess.DEVNULL,
+    )
+    if probe.returncode == -9:
+        pytest.skip(
+            "Amplify Swift native gate requires a signing identity whose keychain "
+            "entitlements survive amfid; this host kills ad-hoc restricted signatures"
+        )
     verified = _bounded_run(
         ["/usr/bin/codesign", "--verify", "--strict", "--verbose=2", str(binary)],
         cwd=work,
