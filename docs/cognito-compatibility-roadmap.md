@@ -12,15 +12,19 @@ operation in the dispatcher does not complete this program. In particular:
 - Amplify v6 direct protocol and Expo Web UI flows have passed against isolated Docker images;
   the Swift/macOS and Android/Robolectric protocol gates are still qualification work and are not
   evidence for iOS Simulator, Android emulator, device, or native Authenticator UI support.
-- WebAuthn cryptography and SDK handlers have unit coverage, but the browser claim remains blocked
-  until a real browser virtual authenticator completes registration and sign-in over the local
-  TLS/RP-origin boundary.
-- Managed-login branding and terms must visibly and safely change the rendered pages. Persisting
-  their API payloads without rendering the result is not support.
+- WebAuthn cryptography and SDK handlers have unit coverage, and
+  `tests/unit/services/cognito_idp/test_webauthn_chrome.py` drives a real Chrome virtual
+  authenticator through registration and sign-in over the local TLS/RP-origin boundary on
+  macOS. Repeating that gate in CI and on other platforms remains qualification work.
+- Managed-login branding and terms must visibly and safely change the rendered pages; gateway
+  evidence now exists in `tests/aws/services/cognito_idp/test_hosted_ui_rendering.py`, which
+  compares branded and uncustomized `/login`, `/signup`, and classic pages through the real
+  gateway. Persisting API payloads without rendering the result is not support.
 - User-import jobs must accept a bounded upload through the returned local presigned URL, execute
-  the CSV state machine, and create AWS-shaped `RESET_REQUIRED` users. Log delivery must reach the
-  configured local destination. Classic UI customization must affect classic pages. Storage-only
-  implementations do not pass these gates.
+  the CSV state machine, and create AWS-shaped `RESET_REQUIRED` users, with log delivery to the
+  configured local destination; gateway evidence now exists in
+  `tests/aws/services/cognito_idp/test_user_import.py`. Storage-only implementations do not pass
+  these gates.
 - A final service-wide claim additionally requires regeneration of capability evidence, one clean
   Docker image, restart coverage, the full regression suite, and zero owned-resource residue.
 
