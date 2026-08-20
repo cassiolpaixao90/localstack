@@ -39,7 +39,11 @@ cleanup() {
   docker logs "$container" >"$log_file" 2>&1 || true
   if [[ "${CDK_DOCKER_GATE_KEEP:-0}" != "1" ]]; then
     docker rm -f "$container" >/dev/null 2>&1 || true
-    rm -rf "$state_dir"
+    # The container runs as root; on CI runners the state files it wrote are not
+    # removable by the workspace user, so delete them through a throwaway container.
+    rm -rf "$state_dir" 2>/dev/null \
+      || docker run --rm --entrypoint rm -v "$state_dir:/state" "$image" -rf /state \
+      || true
   fi
   echo "container log: $log_file" >&2
   exit $status

@@ -660,7 +660,7 @@
       }
     ]
   },
-  "inventory_sha256": "sha256:33f47d5064ba09f1df8dc28eee8121c753f56eaa741261358185f2adda098b16",
+  "inventory_sha256": "sha256:f72d327b643e37278c7a1faf4cbee6fab603552ffb9d1d2056ba115bf5f82c31",
   "model_catalog_sha256": "sha256:f13e7bb3598f143ff1a14b3e0cbe6f8028721fe5ab6d4b980edba7e3904d59cd",
   "schema_version": 1,
   "services": {
@@ -13673,7 +13673,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "add_custom_attributes",
-            "line": 879,
+            "line": 876,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13699,7 +13699,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "add_user_pool_client_secret",
-            "line": 4930,
+            "line": 4937,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13725,7 +13725,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_add_user_to_group",
-            "line": 2715,
+            "line": 2712,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13751,7 +13751,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_confirm_sign_up",
-            "line": 2920,
+            "line": 2917,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13777,7 +13777,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_create_user",
-            "line": 2452,
+            "line": 2449,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13803,7 +13803,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_delete_user",
-            "line": 2827,
+            "line": 2824,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13829,7 +13829,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_delete_user_attributes",
-            "line": 2898,
+            "line": 2895,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13855,7 +13855,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_disable_provider_for_user",
-            "line": 2409,
+            "line": 2406,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13881,7 +13881,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_disable_user",
-            "line": 2852,
+            "line": 2849,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13907,7 +13907,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_enable_user",
-            "line": 2841,
+            "line": 2838,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13933,7 +13933,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_forget_device",
-            "line": 3667,
+            "line": 3664,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13959,7 +13959,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_get_device",
-            "line": 3684,
+            "line": 3681,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -13985,7 +13985,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_get_user",
-            "line": 2785,
+            "line": 2782,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14011,7 +14011,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_get_user_auth_factors",
-            "line": 3845,
+            "line": 3842,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14037,7 +14037,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_initiate_auth",
-            "line": 3853,
+            "line": 3850,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14063,7 +14063,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_link_provider_for_user",
-            "line": 2338,
+            "line": 2335,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14089,7 +14089,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_list_devices",
-            "line": 3691,
+            "line": 3688,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14115,7 +14115,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_list_groups_for_user",
-            "line": 2745,
+            "line": 2742,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14141,7 +14141,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_list_user_auth_events",
-            "line": 3945,
+            "line": 3942,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14167,7 +14167,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_remove_user_from_group",
-            "line": 2733,
+            "line": 2730,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14193,7 +14193,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_reset_user_password",
-            "line": 2938,
+            "line": 2935,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14219,7 +14219,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_respond_to_auth_challenge",
-            "line": 4290,
+            "line": 4296,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14245,7 +14245,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_set_user_mfa_preference",
-            "line": 4724,
+            "line": 4731,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14271,7 +14271,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_set_user_password",
-            "line": 2627,
+            "line": 2624,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14297,7 +14297,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_set_user_settings",
-            "line": 3817,
+            "line": 3814,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14323,7 +14323,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_update_auth_event_feedback",
-            "line": 3983,
+            "line": 3980,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14349,7 +14349,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_update_device_status",
-            "line": 3706,
+            "line": 3703,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14375,7 +14375,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_update_user_attributes",
-            "line": 2865,
+            "line": 2862,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14401,7 +14401,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "admin_user_global_sign_out",
-            "line": 3645,
+            "line": 3642,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14427,7 +14427,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "associate_software_token",
-            "line": 4594,
+            "line": 4600,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14453,7 +14453,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "change_password",
-            "line": 3408,
+            "line": 3405,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14479,7 +14479,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "complete_web_authn_registration",
-            "line": 4460,
+            "line": 4466,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14505,7 +14505,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "confirm_device",
-            "line": 3725,
+            "line": 3722,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14531,7 +14531,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "confirm_forgot_password",
-            "line": 3349,
+            "line": 3346,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14557,7 +14557,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "confirm_sign_up",
-            "line": 3137,
+            "line": 3134,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14583,7 +14583,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_group",
-            "line": 2646,
+            "line": 2643,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14609,7 +14609,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_identity_provider",
-            "line": 2115,
+            "line": 2112,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14635,7 +14635,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_managed_login_branding",
-            "line": 1416,
+            "line": 1413,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14661,7 +14661,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_resource_server",
-            "line": 1637,
+            "line": 1634,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14687,7 +14687,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_terms",
-            "line": 1536,
+            "line": 1533,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14713,7 +14713,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_user_import_job",
-            "line": 913,
+            "line": 910,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14739,7 +14739,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_user_pool",
-            "line": 782,
+            "line": 779,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14765,7 +14765,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_user_pool_client",
-            "line": 1750,
+            "line": 1747,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14791,7 +14791,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_user_pool_domain",
-            "line": 1270,
+            "line": 1267,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14817,7 +14817,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "create_user_pool_replica",
-            "line": 1098,
+            "line": 1095,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14843,7 +14843,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_group",
-            "line": 2692,
+            "line": 2689,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14869,7 +14869,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_identity_provider",
-            "line": 2293,
+            "line": 2290,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14895,7 +14895,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_managed_login_branding",
-            "line": 1524,
+            "line": 1521,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14921,7 +14921,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_resource_server",
-            "line": 1679,
+            "line": 1676,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14947,7 +14947,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_terms",
-            "line": 1611,
+            "line": 1608,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14973,7 +14973,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_user",
-            "line": 3656,
+            "line": 3653,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -14999,7 +14999,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_user_attributes",
-            "line": 3526,
+            "line": 3523,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15025,7 +15025,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_user_pool",
-            "line": 1214,
+            "line": 1211,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15051,7 +15051,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_user_pool_client",
-            "line": 2055,
+            "line": 2052,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15077,7 +15077,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_user_pool_client_secret",
-            "line": 4973,
+            "line": 4980,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15103,7 +15103,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_user_pool_domain",
-            "line": 1335,
+            "line": 1332,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15129,7 +15129,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_user_pool_replica",
-            "line": 1161,
+            "line": 1158,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15155,7 +15155,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "delete_web_authn_credential",
-            "line": 4576,
+            "line": 4582,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15181,7 +15181,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_identity_provider",
-            "line": 2203,
+            "line": 2200,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15207,7 +15207,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_managed_login_branding",
-            "line": 1448,
+            "line": 1445,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15233,7 +15233,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_managed_login_branding_by_client",
-            "line": 1465,
+            "line": 1462,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15259,7 +15259,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_resource_server",
-            "line": 1655,
+            "line": 1652,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15285,7 +15285,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_risk_configuration",
-            "line": 4016,
+            "line": 4013,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15311,7 +15311,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_terms",
-            "line": 1575,
+            "line": 1572,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15337,7 +15337,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_user_import_job",
-            "line": 932,
+            "line": 929,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15363,7 +15363,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_user_pool",
-            "line": 860,
+            "line": 857,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15389,7 +15389,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_user_pool_client",
-            "line": 1893,
+            "line": 1890,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15415,7 +15415,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "describe_user_pool_domain",
-            "line": 1307,
+            "line": 1304,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15441,7 +15441,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "forget_device",
-            "line": 3770,
+            "line": 3767,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15467,7 +15467,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "forgot_password",
-            "line": 3270,
+            "line": 3267,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15493,7 +15493,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_csv_header",
-            "line": 901,
+            "line": 898,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15519,7 +15519,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_device",
-            "line": 3784,
+            "line": 3781,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15545,7 +15545,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_group",
-            "line": 2670,
+            "line": 2667,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15571,7 +15571,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_identity_provider_by_identifier",
-            "line": 2322,
+            "line": 2319,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15623,7 +15623,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_provisioned_limit",
-            "line": 1180,
+            "line": 1177,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15649,7 +15649,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_signing_certificate",
-            "line": 2107,
+            "line": 2104,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15675,7 +15675,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_tokens_from_refresh_token",
-            "line": 4778,
+            "line": 4785,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15701,7 +15701,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_ui_customization",
-            "line": 1357,
+            "line": 1354,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15727,7 +15727,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_user",
-            "line": 3398,
+            "line": 3395,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15753,7 +15753,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_user_attribute_verification_code",
-            "line": 3554,
+            "line": 3551,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15779,7 +15779,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_user_auth_factors",
-            "line": 3837,
+            "line": 3834,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15805,7 +15805,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "get_user_pool_mfa_config",
-            "line": 4379,
+            "line": 4385,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15831,7 +15831,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "global_sign_out",
-            "line": 3637,
+            "line": 3634,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15857,7 +15857,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "initiate_auth",
-            "line": 4069,
+            "line": 4066,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15883,7 +15883,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_devices",
-            "line": 3790,
+            "line": 3787,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15909,7 +15909,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_groups",
-            "line": 2701,
+            "line": 2698,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15935,7 +15935,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_identity_providers",
-            "line": 2304,
+            "line": 2301,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15961,7 +15961,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_resource_servers",
-            "line": 1691,
+            "line": 1688,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -15987,7 +15987,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_tags_for_resource",
-            "line": 1741,
+            "line": 1738,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16013,7 +16013,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_terms",
-            "line": 1621,
+            "line": 1618,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16039,7 +16039,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_user_import_jobs",
-            "line": 945,
+            "line": 942,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16065,7 +16065,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_user_pool_client_secrets",
-            "line": 4994,
+            "line": 5001,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16091,7 +16091,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_user_pool_clients",
-            "line": 1902,
+            "line": 1899,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16117,7 +16117,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_user_pool_replicas",
-            "line": 1122,
+            "line": 1119,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16143,7 +16143,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_user_pools",
-            "line": 1068,
+            "line": 1065,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16169,7 +16169,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_users",
-            "line": 2791,
+            "line": 2788,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16195,7 +16195,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_users_in_group",
-            "line": 2765,
+            "line": 2762,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16221,7 +16221,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "list_web_authn_credentials",
-            "line": 4536,
+            "line": 4542,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16247,7 +16247,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "resend_confirmation_code",
-            "line": 3201,
+            "line": 3198,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16273,7 +16273,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "respond_to_auth_challenge",
-            "line": 4164,
+            "line": 4161,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16299,7 +16299,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "revoke_token",
-            "line": 4743,
+            "line": 4750,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16351,7 +16351,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "set_risk_configuration",
-            "line": 4027,
+            "line": 4024,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16377,7 +16377,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "set_ui_customization",
-            "line": 1374,
+            "line": 1371,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16403,7 +16403,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "set_user_mfa_preference",
-            "line": 4712,
+            "line": 4719,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16429,7 +16429,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "set_user_pool_mfa_config",
-            "line": 4315,
+            "line": 4321,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16455,7 +16455,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "set_user_settings",
-            "line": 3827,
+            "line": 3824,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16481,7 +16481,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "sign_up",
-            "line": 2991,
+            "line": 2988,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16507,7 +16507,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "start_user_import_job",
-            "line": 959,
+            "line": 956,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16533,7 +16533,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "start_web_authn_registration",
-            "line": 4387,
+            "line": 4393,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16559,7 +16559,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "stop_user_import_job",
-            "line": 972,
+            "line": 969,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16585,7 +16585,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "tag_resource",
-            "line": 1717,
+            "line": 1714,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16611,7 +16611,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "untag_resource",
-            "line": 1730,
+            "line": 1727,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16637,7 +16637,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_auth_event_feedback",
-            "line": 3996,
+            "line": 3993,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16663,7 +16663,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_device_status",
-            "line": 3802,
+            "line": 3799,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16689,7 +16689,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_group",
-            "line": 2676,
+            "line": 2673,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16715,7 +16715,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_identity_provider",
-            "line": 2212,
+            "line": 2209,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16741,7 +16741,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_managed_login_branding",
-            "line": 1482,
+            "line": 1479,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16767,7 +16767,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_provisioned_limit",
-            "line": 1196,
+            "line": 1193,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16793,7 +16793,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_resource_server",
-            "line": 1664,
+            "line": 1661,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16819,7 +16819,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_terms",
-            "line": 1582,
+            "line": 1579,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16845,7 +16845,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_user_attributes",
-            "line": 3425,
+            "line": 3422,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16871,7 +16871,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_user_pool",
-            "line": 985,
+            "line": 982,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16897,7 +16897,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_user_pool_client",
-            "line": 1932,
+            "line": 1929,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16923,7 +16923,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_user_pool_domain",
-            "line": 1317,
+            "line": 1314,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16949,7 +16949,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "update_user_pool_replica",
-            "line": 1141,
+            "line": 1138,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -16975,7 +16975,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "verify_software_token",
-            "line": 4640,
+            "line": 4646,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false
@@ -17001,7 +17001,7 @@
             "conditional_notimplemented": false,
             "direct_fallback": null,
             "function": "verify_user_attribute",
-            "line": 3597,
+            "line": 3594,
             "module": "localstack.services.cognito_idp.provider",
             "source": "localstack-core/localstack/services/cognito_idp/provider.py",
             "unconditional_notimplemented": false

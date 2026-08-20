@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "map_sha256": "sha256:1e34b61cfb5354b6de9c5da71966f624d0410cb4e630f850ded8923187e16d2f",
+  "map_sha256": "sha256:2d3548ffcfe759131bd432ae4047e405d262f7f27604f5abf956de7b660f73bc",
   "claim": "static-inventory-only",
   "methodology": {
     "denominator": "pinned-aws-cdk-lib-jsii-cloudformation-resources",
@@ -23,8 +23,8 @@
     },
     "localstack_capability_catalog": {
       "path": "capabilities/generated/capabilities.json",
-      "sha256": "sha256:7c754a65e0eefce0fe5c41764cd76a6f7b62de01a81909a721e073a44e002ed5",
-      "inventory_sha256": "sha256:1a44df47d6c1450fd214472599d3d9f96a12edde9ea30a9c8b21fac31eae9a54",
+      "sha256": "sha256:c433946c99ca009a559081805621906cbd9ccea46128be66069facd354d143e7",
+      "inventory_sha256": "sha256:f72d327b643e37278c7a1faf4cbee6fab603552ffb9d1d2056ba115bf5f82c31",
       "botocore_version": "1.43.67"
     }
   },

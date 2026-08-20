@@ -416,9 +416,14 @@ def _network_isolated() -> bool:
         return False
     try:
         routes = Path("/proc/net/route").read_text().splitlines()[1:]
-        routes6 = Path("/proc/net/ipv6_route").read_text().splitlines()
     except OSError:
         return False
+    # A missing ipv6_route file means IPv6 is disabled in this namespace, i.e. there are
+    # no IPv6 routes to audit — that is isolated, not a failure to prove isolation.
+    try:
+        routes6 = Path("/proc/net/ipv6_route").read_text().splitlines()
+    except OSError:
+        routes6 = []
     return not any(line.split()[1] == "00000000" for line in routes if line.split()) and not any(
         line.split()[0] == "0" * 32 and line.split()[1] == "00" for line in routes6 if line.split()
     )

@@ -18,8 +18,8 @@ O checkout ainda nao oferece todas as features AWS. A maior parte do denominador
 
 | Fonte | Versao/claim | SHA-256 dos bytes | Digest semantico |
 |---|---|---|---|
-| `capabilities/generated/capabilities.json` | Botocore `1.43.67` | `sha256:7c754a65e0eefce0fe5c41764cd76a6f7b62de01a81909a721e073a44e002ed5` | `sha256:1a44df47d6c1450fd214472599d3d9f96a12edde9ea30a9c8b21fac31eae9a54` |
-| `capabilities/cdk/services.json` | aws-cdk-lib `2.241.0` / `static-inventory-only` | `sha256:91cdc4a33e32a1669a0b9f4abd734d36a4d04d017ad56e4c2074be4822e5cfd1` | `sha256:1e34b61cfb5354b6de9c5da71966f624d0410cb4e630f850ded8923187e16d2f` |
+| `capabilities/generated/capabilities.json` | Botocore `1.43.67` | `sha256:c433946c99ca009a559081805621906cbd9ccea46128be66069facd354d143e7` | `sha256:f72d327b643e37278c7a1faf4cbee6fab603552ffb9d1d2056ba115bf5f82c31` |
+| `capabilities/cdk/services.json` | aws-cdk-lib `2.241.0` / `static-inventory-only` | `sha256:d7406554bd3ed873b60d48d59ed0f86b86895029c49bf3c73989846fffb23e9b` | `sha256:2d3548ffcfe759131bd432ae4047e405d262f7f27604f5abf956de7b660f73bc` |
 | `capabilities/cdk/compatibility.json` | schema `2` | `sha256:26e24331c65249450c4eaa019c55abfdb918795b90802c5bb3c98acf95847605` | `sha256:786dd38252a62f68607d668bc2dc7559ba691bec6fd4def967f383e18c7e0193` |
 
 ## Lacunas de operacoes AWS
@@ -28,8 +28,8 @@ O checkout ainda nao oferece todas as features AWS. A maior parte do denominador
 |---|---:|---:|---|
 | `missing` | 15,932 | 83.88% | Sem interface/provider classificado neste checkout |
 | `scaffold` | 286 | 1.51% | Handler gerado sem implementacao ou fallback |
-| `fallback` | 1,939 | 10.21% | Delegacao Moto/HTTP; comportamento e estado podem divergir |
-| `partial` | 836 | 4.40% | Override existe, mas runtime/paridade nao foram promovidos |
+| `fallback` | 1,938 | 10.20% | Delegacao Moto/HTTP; comportamento e estado podem divergir |
+| `partial` | 837 | 4.41% | Override existe, mas runtime/paridade nao foram promovidos |
 | `native` | 0 | 0.00% | Exige evidencia runtime nativa |
 | `parity-pass` | 0 | 0.00% | Exige diferencial AWS recente e sem exclusoes criticas |
 
@@ -39,8 +39,8 @@ O checkout ainda nao oferece todas as features AWS. A maior parte do denominador
 |---|---:|
 | `fully-missing` | 388 |
 | `scaffold` | 2 |
-| `fallback` | 10 |
-| `partial` | 29 |
+| `fallback` | 9 |
+| `partial` | 30 |
 | `native` | 0 |
 | `parity-pass` | 0 |
 
@@ -567,7 +567,7 @@ A tabela cobre todos os servicos do Botocore pinado. Os nomes exatos das operaco
 | `sso-oidc` | 4 | 4 | 0 | 0 | 0 | 0 | 0 | `-` | 0 |
 | `stepfunctions` | 37 | 0 | 1 | 0 | 36 | 0 | 0 | `default` | 2 |
 | `storagegateway` | 96 | 96 | 0 | 0 | 0 | 0 | 0 | `-` | 0 |
-| `sts` | 11 | 0 | 0 | 11 | 0 | 0 | 0 | `default` | 0 |
+| `sts` | 11 | 0 | 0 | 10 | 1 | 0 | 0 | `default` | 0 |
 | `supplychain` | 30 | 30 | 0 | 0 | 0 | 0 | 0 | `-` | 0 |
 | `support` | 16 | 0 | 0 | 16 | 0 | 0 | 0 | `default` | 0 |
 | `support-app` | 10 | 10 | 0 | 0 | 0 | 0 | 0 | `-` | 0 |

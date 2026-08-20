@@ -4,7 +4,7 @@
 
 Botocore catalog: `1.43.67`
 Botocore model catalog digest: `sha256:f13e7bb3598f143ff1a14b3e0cbe6f8028721fe5ab6d4b980edba7e3904d59cd`
-Capability inventory digest: `sha256:33f47d5064ba09f1df8dc28eee8121c753f56eaa741261358185f2adda098b16`
+Capability inventory digest: `sha256:f72d327b643e37278c7a1faf4cbee6fab603552ffb9d1d2056ba115bf5f82c31`
 Services: **429**
 Operations: **18993**
 Generated interfaces: **37**

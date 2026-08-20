@@ -168,7 +168,9 @@ def test_cdk_cli_blackbox_ci_matrix_is_pinned_and_network_isolated():
     assert "sub(/@.*/" not in isolated_runner
     assert 'readonly interfaces="$' not in isolated_runner
     assert "readonly interfaces" in isolated_runner
-    assert isolated_runner.count(".venv/bin/python -I -S") == 4
+    assert "tests/aws/cli/test_cdk_cli_cognito_deploy.py" in isolated_runner
+    assert "pytest-junit-cdk-cognito-lifecycle-$RESULT_ARCH.xml" in isolated_runner
+    assert isolated_runner.count(".venv/bin/python -I -S") == 5
     assert steps["Archive lane result"]["uses"] == (
         "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     )
