@@ -63,6 +63,13 @@ integration tests only: it is not IAM policy enforcement, not SigV4 signature
 verification, not an AWS differential validation, and not an STS service-wide
 claim.
 
+Cognito Sync now has local integration coverage through the real gateway in
+addition to its unit suite: dataset lifecycle, sync-session and stale-count
+conflicts, incremental `ListRecords` semantics, deletion tombstones, bounded
+pagination with cursor validation, usage reporting, and fail-closed unknown
+pool/identity/token paths. These are `only_localstack` tests: they are not an
+AWS differential validation and do not promote any Sync operation.
+
 Metrics mode now appends request dispatch origins to the local raw CSV. The
 existing Tinybird `tests_raw__v0` uploader does not ingest that new column; a
 versioned remote schema and evidence importer are explicit Wave 0 follow-up.
