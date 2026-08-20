@@ -39,6 +39,77 @@ def load_native_service_snapshots() -> None:
     router.register_routes()
     router.sync_custom_domains()
 
+    _repair_restored_lambda_state()
+    _fail_in_progress_cloudformation_stacks()
+    _reset_restored_sqs_queues()
+
+
+def _repair_restored_lambda_state() -> None:
+    """Re-create in-process version managers for restored functions.
+
+    Restored function versions are Active in the store but have no version manager in the
+    process-local registry, so invokes would fail with ResourceConflictException. The repair
+    waits at most 5s per version and logs failures instead of raising, so startup cannot hang.
+    """
+    from localstack.services.lambda_.invocation.models import lambda_stores
+
+    if not lambda_stores:
+        return
+
+    from localstack.services.lambda_.provider import LambdaProvider
+    from localstack.services.plugins import SERVICE_PLUGINS
+
+    container = SERVICE_PLUGINS.get_service_container("lambda")
+    provider = getattr(container.service, "_provider", None) if container else None
+    if not isinstance(provider, LambdaProvider):
+        LOG.warning("Unable to repair restored Lambda state: lambda provider is unavailable")
+        return
+    provider.on_after_state_load()
+
+
+# Terminal statuses for stacks interrupted mid-operation by a shutdown. On AWS an interrupted
+# update or import rolls back; LocalStack cannot resume the rollback after a restart, so those
+# stacks land in the rollback-failed terminal state. Interrupted creates and deletes fail
+# outright. REVIEW_IN_PROGRESS is a stable user-waiting state, not an in-flight operation.
+_IN_PROGRESS_STACK_TERMINALS = {
+    "CREATE_IN_PROGRESS": "CREATE_FAILED",
+    "ROLLBACK_IN_PROGRESS": "ROLLBACK_FAILED",
+    "DELETE_IN_PROGRESS": "DELETE_FAILED",
+    "UPDATE_IN_PROGRESS": "UPDATE_ROLLBACK_FAILED",
+    "UPDATE_COMPLETE_CLEANUP_IN_PROGRESS": "UPDATE_ROLLBACK_FAILED",
+    "UPDATE_ROLLBACK_IN_PROGRESS": "UPDATE_ROLLBACK_FAILED",
+    "UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS": "UPDATE_ROLLBACK_FAILED",
+    "IMPORT_IN_PROGRESS": "IMPORT_ROLLBACK_FAILED",
+    "IMPORT_ROLLBACK_IN_PROGRESS": "IMPORT_ROLLBACK_FAILED",
+}
+_STACK_RESTART_REASON = "LocalStack restarted while the stack operation was in progress"
+
+
+def _fail_in_progress_cloudformation_stacks() -> None:
+    from localstack.aws.api.cloudformation import StackStatus
+    from localstack.services.cloudformation.stores import cloudformation_stores
+
+    for _, _, store in cloudformation_stores.iter_stores():
+        for stack in store.stacks.values():
+            if terminal := _IN_PROGRESS_STACK_TERMINALS.get(stack.status):
+                stack.set_stack_status(terminal, _STACK_RESTART_REASON)
+        for stack in store.stacks_v2.values():
+            if terminal := _IN_PROGRESS_STACK_TERMINALS.get(stack.status):
+                stack.set_stack_status(StackStatus(terminal), _STACK_RESTART_REASON)
+
+
+def _reset_restored_sqs_queues() -> None:
+    from localstack.services.sqs.models import FifoQueue, StandardQueue, sqs_stores
+
+    for _, _, store in sqs_stores.iter_stores():
+        for queue in store.queues.values():
+            # SqsProvider.on_before_stop shuts queues down to unblock receivers. The flag is
+            # process-local and must not survive a restart, regardless of hook ordering.
+            if isinstance(queue, StandardQueue):
+                queue.visible.is_shutdown = False
+            elif isinstance(queue, FifoQueue):
+                queue.message_group_queue.is_shutdown = False
+
 
 @hooks.on_infra_shutdown(priority=100, should_load=_native_snapshot_save_enabled)
 def save_native_service_snapshots() -> None:

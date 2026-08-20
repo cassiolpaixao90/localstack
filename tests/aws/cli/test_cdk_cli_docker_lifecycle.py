@@ -535,9 +535,44 @@ def test_cdk_docker_full_lifecycle_with_restart(docker_gate: DockerGate, tmp_pat
             "VisibilityTimeout": "60"
         }
 
-        # Phase 4: destroy through the real CDK CLI and prove zero residue. This must
-        # precede the restart phase: CFN stack state does not survive a container
-        # restart yet, so `cdk destroy` cannot track the stack afterwards.
+        # Phase 4: container restart keeps the full deployed topology. All services
+        # in this stack are registered in NATIVE_SERVICE_STORES, so the CFN stack,
+        # queue, topic, table, function, API, and user pool must survive, and the
+        # CDK CLI must still be able to destroy the stack afterwards.
+        container_id = _docker("inspect", "--format", "{{.Id}}", gate.container)
+        _docker("stop", "--time", "15", gate.container)
+        _docker("start", gate.container)
+        _wait_healthy(gate.endpoint)
+        assert _docker("inspect", "--format", "{{.Id}}", gate.container) == container_id
+        assert _stack_status(cloudformation, gate.stack_name) == "UPDATE_COMPLETE"
+        assert outputs["QueueUrl"] in _queue_inventory(gate.clients["sqs"], deadline=_deadline())
+        assert _queue_attributes(gate.clients["sqs"], outputs["QueueUrl"]) == {
+            "VisibilityTimeout": "60"
+        }
+        assert outputs["TopicArn"] in _topic_inventory(gate.clients["sns"], deadline=_deadline())
+        assert outputs["TableName"] in _table_inventory(
+            gate.clients["dynamodb"], deadline=_deadline()
+        )
+        assert outputs["FunctionName"] in _function_inventory(
+            gate.clients["lambda"], deadline=_deadline()
+        )
+        assert outputs["ApiId"] in _api_inventory(
+            gate.clients["apigatewayv2"], deadline=_deadline()
+        )
+        assert outputs["UserPoolId"] in _pool_inventory(
+            gate.clients["cognito-idp"], deadline=_deadline()
+        )
+        restarted_invoke = gate.clients["lambda"].invoke(FunctionName=outputs["FunctionName"])
+        assert restarted_invoke["StatusCode"] == 200
+        restarted_http = requests.get(
+            f"{gate.endpoint}/_aws/execute-api/{outputs['ApiId']}/$default/work/probe-2",
+            timeout=60,
+        )
+        assert restarted_http.status_code == 200
+        assert restarted_http.json()["table"] == outputs["TableName"]
+
+        # Phase 5: destroy through the real CDK CLI after the restart and prove
+        # zero residue.
         result = launch_cdk(
             [
                 "destroy",
@@ -567,23 +602,6 @@ def test_cdk_docker_full_lifecycle_with_restart(docker_gate: DockerGate, tmp_pat
         assert _stack_absent(cloudformation, gate.stack_name)
         residue_after_destroy = _inventories(gate.clients, deadline=_deadline())
         assert residue_after_destroy == baseline, f"destroy left residue: {residue_after_destroy}"
-
-        # Phase 5: container restart keeps the fork-proven persistence surface
-        # (Cognito user pools). SQS/SNS/Lambda/DynamoDB/CFN stack persistence across
-        # restarts is tracked as backlog in docs/cdk-localstack-enterprise.md.
-        probe_pool = gate.clients["cognito-idp"].create_user_pool(
-            PoolName=f"{gate.prefix}-restart-probe",
-            UserPoolTags={OWNER_TAG_KEY: gate.owner_nonce},
-        )["UserPool"]
-        container_id = _docker("inspect", "--format", "{{.Id}}", gate.container)
-        _docker("stop", "--time", "15", gate.container)
-        _docker("start", gate.container)
-        _wait_healthy(gate.endpoint)
-        assert _docker("inspect", "--format", "{{.Id}}", gate.container) == container_id
-        assert probe_pool["Id"] in _pool_inventory(
-            gate.clients["cognito-idp"], deadline=_deadline()
-        )
-        gate.clients["cognito-idp"].delete_user_pool(UserPoolId=probe_pool["Id"])
     finally:
         if not _stack_absent(cloudformation, gate.stack_name):
             try:

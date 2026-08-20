@@ -75,17 +75,24 @@ Notes:
 
 ## Restart persistence boundary (measured)
 
-With `PERSISTENCE=1`, the L2 gate's restart phase measured this surface:
+With `PERSISTENCE=1`, the L2 gate's restart phase verifies this surface (container
+stop/start with the full `enterprise_platform` topology deployed, followed by
+`cdk destroy` against the restarted container):
 
-| Survives container restart | Does not survive yet |
+| Survives container restart | Mechanism |
 |---|---|
-| Cognito user pools (native persistence) | CloudFormation stack records |
-| DynamoDB tables | SQS queues, SNS topics/subscriptions |
-| API Gateway v2 APIs | Lambda functions |
+| CloudFormation stacks (incl. destroy-after-restart) | native store snapshot (`native-v1/`) |
+| SQS queues (standard + FIFO), SNS topics/subscriptions | native store snapshot |
+| Lambda functions (invoke after restart via version-manager repair) | native store snapshot + startup repair |
+| Cognito user pools (encrypted at rest) | native store snapshot (AES-GCM) |
+| DynamoDB tables | DynamoDB Local on-disk DB |
+| API Gateway v2 APIs (routes re-registered at startup) | native store snapshot + startup repair |
 
-Because CFN stack records do not survive a restart today, `cdk destroy` must run **before**
-any restart — after one, the CLI has no stack state to track (it exits 0 without deleting
-physical resources). Closing this gap is backlog item B1 below.
+The opt-in point for additional services is `NATIVE_SERVICE_STORES` in
+`localstack-core/localstack/state/service_persistence.py`. Stacks left in a
+`*_IN_PROGRESS` state at shutdown are swept to AWS-style rollback-failed terminals
+on load; LocalStack cannot resume an interrupted rollback, matching the fail-closed
+rollback semantics of the v2 engine.
 
 ## Coverage backlog (priority order)
 

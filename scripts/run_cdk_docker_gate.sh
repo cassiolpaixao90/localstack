@@ -7,6 +7,8 @@
 # Optional env:
 #   CDK_DOCKER_GATE_IMAGE    image to test (default: localstack/localstack:current)
 #   CDK_DOCKER_GATE_BUILD=1  build the image via bin/docker-helper.sh when missing
+#   CDK_DOCKER_GATE_OVERLAY=1  bind-mount this checkout's localstack-core over the
+#                              image's source (fast iteration without image rebuild)
 #   CDK_EXPECTED_NODE_VERSION  relax the Node pin outside required CI lanes
 #   CDK_DOCKER_GATE_KEEP=1   keep container and state for debugging
 set -euo pipefail
@@ -44,11 +46,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
+overlay_args=()
+if [[ "${CDK_DOCKER_GATE_OVERLAY:-0}" == "1" ]]; then
+  overlay_args=(-v "$PWD/localstack-core:/opt/code/localstack/localstack-core:ro")
+fi
+
 echo "starting $container from $image on $endpoint" >&2
 docker run -d --name "$container" \
   -p "127.0.0.1:${port}:4566" \
   -v "$state_dir:/var/lib/localstack" \
   -v /var/run/docker.sock:/var/run/docker.sock \
+  ${overlay_args[@]+"${overlay_args[@]}"} \
   -e PERSISTENCE=1 \
   -e DEBUG="${DEBUG:-0}" \
   "$image" >/dev/null

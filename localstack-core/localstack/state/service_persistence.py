@@ -56,12 +56,17 @@ _LOCK_PRIORITY = {
 
 NATIVE_SERVICE_STORES = {
     "apigatewayv2": ("localstack.services.apigatewayv2.models", "apigatewayv2_stores"),
+    "cloudformation": ("localstack.services.cloudformation.stores", "cloudformation_stores"),
     "cognito-idp": ("localstack.services.cognito_idp.models", "cognito_idp_stores"),
     "cognito-identity": (
         "localstack.services.cognito_identity.models",
         "cognito_identity_stores",
     ),
     "cognito-sync": ("localstack.services.cognito_sync.models", "cognito_sync_stores"),
+    "dynamodb": ("localstack.services.dynamodb.models", "dynamodb_stores"),
+    "lambda": ("localstack.services.lambda_.invocation.models", "lambda_stores"),
+    "sns": ("localstack.services.sns.models", "sns_stores"),
+    "sqs": ("localstack.services.sqs.models", "sqs_stores"),
 }
 
 
