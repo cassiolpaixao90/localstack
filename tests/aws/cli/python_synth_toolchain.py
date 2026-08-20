@@ -411,6 +411,15 @@ def download_wheelhouse(
         raise
 
 
+def _is_ipv6_default_route(line: str) -> bool:
+    fields = line.split()
+    if len(fields) < 6 or fields[0] != "0" * 32 or fields[1] != "00":
+        return False
+    # The kernel installs an unreachable ::/0 reject route (metric 0xffffffff) when
+    # loopback comes up with IPv6 enabled; it is not egress.
+    return fields[5] != "ffffffff"
+
+
 def _network_isolated() -> bool:
     if sys.platform != "linux" or {name for _, name in socket.if_nameindex()} != {"lo"}:
         return False
@@ -425,7 +434,7 @@ def _network_isolated() -> bool:
     except OSError:
         routes6 = []
     return not any(line.split()[1] == "00000000" for line in routes if line.split()) and not any(
-        line.split()[0] == "0" * 32 and line.split()[1] == "00" for line in routes6 if line.split()
+        _is_ipv6_default_route(line) for line in routes6 if line.split()
     )
 
 
