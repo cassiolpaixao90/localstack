@@ -74,6 +74,10 @@ def get_account_id_from_access_key_id(access_key_id: str) -> str:
 
             elif access_key_id.startswith("LSIA") or access_key_id.startswith("LKIA"):
                 return extract_account_id_from_access_key_id(access_key_id)
+
+            elif access_key_id.startswith("LSIS"):
+                # natively issued STS session credentials (see localstack.services.sts.credentials)
+                return extract_account_id_from_access_key_id(access_key_id)
         else:
             if access_key_id.startswith("ASIA") or access_key_id.startswith("AKIA"):
                 return extract_account_id_from_access_key_id(access_key_id)

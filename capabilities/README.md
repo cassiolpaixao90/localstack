@@ -54,9 +54,14 @@ verify OpenID tokens issued by local Cognito Identity pools (RS256 signature,
 issuer, audience, and trust-policy conditions) and register temporary sessions
 in the STS store, while the remaining nine STS operations still delegate to
 Moto. `GetCredentialsForIdentity` issues through the same native engine
-instead of the Moto STS backend. This slice is covered by unit and local
-integration tests only: it is not IAM policy enforcement, not an AWS
-differential validation, and not an STS service-wide claim.
+instead of the Moto STS backend. Natively issued access keys carry the
+reserved `LSIS` prefix, and a gateway handler fails closed on requests using
+them when the session is revoked, expired, unknown, or presents a mismatched
+session token (`InvalidClientTokenId`/`ExpiredToken`); all other access keys
+keep the default permissive behavior. This slice is covered by unit and local
+integration tests only: it is not IAM policy enforcement, not SigV4 signature
+verification, not an AWS differential validation, and not an STS service-wide
+claim.
 
 Metrics mode now appends request dispatch origins to the local raw CSV. The
 existing Tinybird `tests_raw__v0` uploader does not ingest that new column; a

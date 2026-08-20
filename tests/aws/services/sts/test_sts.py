@@ -251,6 +251,128 @@ class TestSTSIntegrations:
         finally:
             aws_client.cognito_identity.delete_identity_pool(IdentityPoolId=pool_id)
 
+    def _setup_pool_role_identity(self, aws_client, create_role, account_id):
+        pool = aws_client.cognito_identity.create_identity_pool(
+            IdentityPoolName=f"pool-{short_uid()}",
+            AllowUnauthenticatedIdentities=True,
+            AllowClassicFlow=True,
+        )
+        pool_id = pool["IdentityPoolId"]
+        trust_policy = {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": "sts:AssumeRoleWithWebIdentity",
+                    "Principal": {"Federated": "cognito-identity.amazonaws.com"},
+                    "Condition": {
+                        "StringEquals": {"cognito-identity.amazonaws.com:aud": pool_id},
+                        "ForAnyValue:StringEquals": {
+                            "cognito-identity.amazonaws.com:amr": "unauthenticated"
+                        },
+                    },
+                }
+            ],
+        }
+        role = create_role(
+            RoleName=f"role-{short_uid()}",
+            AssumeRolePolicyDocument=json.dumps(trust_policy),
+        )
+        role_arn = role["Role"]["Arn"]
+        aws_client.cognito_identity.set_identity_pool_roles(
+            IdentityPoolId=pool_id, Roles={"unauthenticated": role_arn}
+        )
+        identity_id = aws_client.cognito_identity.get_id(
+            AccountId=account_id, IdentityPoolId=pool_id
+        )["IdentityId"]
+        token = aws_client.cognito_identity.get_open_id_token(IdentityId=identity_id)["Token"]
+        return pool_id, identity_id, role_arn, token
+
+    @markers.aws.only_localstack
+    def test_native_session_credentials_work_against_s3(
+        self, aws_client, create_role, account_id, region_name
+    ):
+        pool_id, _, role_arn, token = self._setup_pool_role_identity(
+            aws_client, create_role, account_id
+        )
+        try:
+            response = aws_client.sts.assume_role_with_web_identity(
+                RoleArn=role_arn,
+                RoleSessionName=f"session-{short_uid()}",
+                WebIdentityToken=token,
+            )
+            s3 = create_client_with_keys("s3", response["Credentials"], region_name=region_name)
+            bucket = f"bucket-{short_uid()}"
+            s3.create_bucket(Bucket=bucket)
+            assert bucket in [b["Name"] for b in s3.list_buckets()["Buckets"]]
+        finally:
+            aws_client.cognito_identity.delete_identity_pool(IdentityPoolId=pool_id)
+
+    @markers.aws.only_localstack
+    def test_native_session_credentials_fail_closed(
+        self, aws_client, create_role, account_id, region_name
+    ):
+        pool_id, identity_id, role_arn, token = self._setup_pool_role_identity(
+            aws_client, create_role, account_id
+        )
+        pool_deleted = False
+        try:
+            response = aws_client.sts.assume_role_with_web_identity(
+                RoleArn=role_arn,
+                RoleSessionName=f"session-{short_uid()}",
+                WebIdentityToken=token,
+            )
+            credentials = response["Credentials"]
+
+            tampered = dict(credentials, SessionToken=f"tampered-{credentials['SessionToken']}")
+            tampered_s3 = create_client_with_keys("s3", tampered, region_name=region_name)
+            with pytest.raises(ClientError) as e:
+                tampered_s3.list_buckets()
+            assert e.value.response["Error"]["Code"] == "InvalidClientTokenId"
+
+            tokenless = {
+                "AccessKeyId": credentials["AccessKeyId"],
+                "SecretAccessKey": credentials["SecretAccessKey"],
+            }
+            tokenless_s3 = create_client_with_keys("s3", tokenless, region_name=region_name)
+            with pytest.raises(ClientError) as e:
+                tokenless_s3.list_buckets()
+            assert e.value.response["Error"]["Code"] == "InvalidClientTokenId"
+
+            # enhanced-flow credentials are revoked when the pool is deleted
+            enhanced = aws_client.cognito_identity.get_credentials_for_identity(
+                IdentityId=identity_id
+            )["Credentials"]
+            enhanced_s3 = create_client_with_keys(
+                "s3",
+                {
+                    "AccessKeyId": enhanced["AccessKeyId"],
+                    "SecretAccessKey": enhanced["SecretKey"],
+                    "SessionToken": enhanced["SessionToken"],
+                },
+                region_name=region_name,
+            )
+            assert enhanced_s3.list_buckets()["Buckets"] is not None
+
+            aws_client.cognito_identity.delete_identity_pool(IdentityPoolId=pool_id)
+            pool_deleted = True
+            with pytest.raises(ClientError) as e:
+                enhanced_s3.list_buckets()
+            assert e.value.response["Error"]["Code"] == "InvalidClientTokenId"
+        finally:
+            if not pool_deleted:
+                aws_client.cognito_identity.delete_identity_pool(IdentityPoolId=pool_id)
+
+    @markers.aws.only_localstack
+    def test_unregistered_access_keys_remain_permissive(self, aws_client, region_name):
+        # a made-up legacy-format key must keep the default permissive behavior
+        s3 = create_client_with_keys(
+            "s3",
+            {"AccessKeyId": "LSIAQAAAAAAAGMKEM7X5", "SecretAccessKey": "a" * 40},
+            region_name=region_name,
+        )
+        assert s3.list_buckets()["Buckets"] is not None
+
     @markers.aws.validated
     def test_assume_role_with_web_identity_cognito_identity_pool(
         self, aws_client, create_role, account_id, region_name, snapshot

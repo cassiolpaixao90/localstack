@@ -1,7 +1,9 @@
 import base64
 import copy
 import dataclasses
+import enum
 import hashlib
+import hmac
 import json
 import re
 import secrets
@@ -26,6 +28,7 @@ _MAX_WEB_IDENTITY_TOKEN_BYTES = 50_000
 _MIN_DURATION_SECONDS = 900
 _MAX_DURATION_SECONDS = 43_200
 DEFAULT_DURATION_SECONDS = 3_600
+NATIVE_SESSION_ACCESS_KEY_PREFIX = "LSIS"
 _ACCOUNT_ID_RE = re.compile(r"^\d{12}$")
 _ROLE_SESSION_NAME_RE = re.compile(r"^[\w+=,.@-]{2,64}$")
 _SECRET_ACCESS_KEY_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/+="
@@ -199,6 +202,56 @@ def resolve_session(
         return session
 
 
+class SessionAuthResult(enum.Enum):
+    NOT_REGISTERED = "not-registered"
+    OK = "ok"
+    EXPIRED = "expired"
+    TOKEN_MISMATCH = "token-mismatch"
+
+
+def authenticate_session(
+    access_key_id: str,
+    session_token: str | None,
+    *,
+    account_id: str | None = None,
+    region: str | None = None,
+    now: datetime | None = None,
+) -> SessionAuthResult:
+    """Authenticate a request carrying a natively issued temporary credential.
+
+    Unlike `resolve_session`, this distinguishes unknown keys from expired
+    sessions so gateway callers can fail closed on the latter.
+    """
+    if not isinstance(access_key_id, str) or not access_key_id:
+        return SessionAuthResult.NOT_REGISTERED
+    if account_id is None:
+        account_id = _account_id_from_key(access_key_id)
+        if account_id is None:
+            return SessionAuthResult.NOT_REGISTERED
+    bundle = sts_stores.get(account_id)
+    if bundle is None:
+        return SessionAuthResult.NOT_REGISTERED
+    store = bundle.get(region) if region else None
+    if store is None:
+        store = next(iter(bundle.values()), None)
+    if store is None:
+        return SessionAuthResult.NOT_REGISTERED
+    with _CREDENTIALS_LOCK:
+        session = store.credential_sessions.get(access_key_id)
+        if session is None:
+            return SessionAuthResult.NOT_REGISTERED
+        current = datetime.now(UTC) if now is None else now
+        if _expiration_timestamp(session.expiration) <= _expiration_timestamp(current):
+            store.credential_sessions.pop(access_key_id, None)
+            store.sessions.pop(access_key_id, None)
+            return SessionAuthResult.EXPIRED
+        if not isinstance(session_token, str) or not session_token:
+            return SessionAuthResult.TOKEN_MISMATCH
+        if not hmac.compare_digest(_sha256(session_token), session.session_token_hash):
+            return SessionAuthResult.TOKEN_MISMATCH
+        return SessionAuthResult.OK
+
+
 def verify_web_identity_token(token: str, *, partition: str) -> WebIdentityClaims:
     """Verify an OpenID token issued by a local Cognito Identity pool, failing closed."""
     # imported lazily so the STS service does not depend on Cognito Identity at load time
@@ -261,10 +314,12 @@ def verify_web_identity_token(token: str, *, partition: str) -> WebIdentityClaim
 
 
 def _generate_access_key_id(account_id: str) -> str:
-    """Generate an LSIA access key embedding the account id.
+    """Generate an LSIS access key embedding the account id.
 
     Inverse of `extract_account_id_from_access_key_id`: the account id is encoded
-    base32 with `ACCOUNT_OFFSET`, and char 12 carries the parity bit.
+    base32 with `ACCOUNT_OFFSET`, and char 12 carries the parity bit. The reserved
+    `LSIS` prefix marks keys minted by this module so the gateway can fail closed
+    on unknown ones without changing the permissive behavior of user-supplied keys.
     """
     account = int(account_id)
     account_id_part = (account // 2 + ACCOUNT_OFFSET).to_bytes(5, byteorder="big")
@@ -272,12 +327,14 @@ def _generate_access_key_id(account_id: str) -> str:
     parity_offset = 16 if account % 2 else 0
     parity_char = AWS_ACCESS_KEY_ALPHABET[parity_offset + secrets.randbelow(16)]
     suffix = "".join(secrets.choice(AWS_ACCESS_KEY_ALPHABET) for _ in range(7))
-    return f"LSIA{encoded}{parity_char}{suffix}"
+    return f"{NATIVE_SESSION_ACCESS_KEY_PREFIX}{encoded}{parity_char}{suffix}"
 
 
 def _account_id_from_key(access_key_id: str) -> str | None:
     if len(access_key_id) < 20 or not (
-        access_key_id.startswith("LSIA") or access_key_id.startswith("LKIA")
+        access_key_id.startswith("LSIA")
+        or access_key_id.startswith("LKIA")
+        or access_key_id.startswith(NATIVE_SESSION_ACCESS_KEY_PREFIX)
     ):
         return None
     return extract_account_id_from_access_key_id(access_key_id)

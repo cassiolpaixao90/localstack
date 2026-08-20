@@ -15,6 +15,8 @@ from localstack.services.cognito_identity.provider import CognitoIdentityProvide
 from localstack.services.iam.iam_patches import apply_iam_patches
 from localstack.services.sts.credentials import (
     CredentialIssueError,
+    SessionAuthResult,
+    authenticate_session,
     issue_role_session,
     resolve_session,
     revoke_role_session,
@@ -137,7 +139,7 @@ def test_issued_session_shape_embeds_account_and_bounds_expiration(context):
 
     issued = _issue(context, role_arn, principal_tags={"Tenant": "acme"})
 
-    assert issued.access_key_id.startswith("LSIA")
+    assert issued.access_key_id.startswith("LSIS")
     assert len(issued.access_key_id) == 20
     assert get_account_id_from_access_key_id(issued.access_key_id) == context.account_id
     assert len(issued.secret_access_key) == 40
@@ -184,6 +186,95 @@ def test_resolve_revoke_and_expiration(context):
     assert resolve_session("not-a-key") is None
     assert resolve_session("") is None
     revoke_role_session("not-a-key")
+
+
+def test_authenticate_session_matrix(context, other_context):
+    role_arn = _role(context, "native-role", _trust("pool", "unauthenticated"))
+    issued = _issue(context, role_arn)
+
+    assert (
+        authenticate_session(
+            issued.access_key_id,
+            issued.session_token,
+            account_id=context.account_id,
+            region=context.region,
+        )
+        is SessionAuthResult.OK
+    )
+    # account and region resolve from the key and the store fallback
+    assert authenticate_session(issued.access_key_id, issued.session_token) is SessionAuthResult.OK
+    assert (
+        authenticate_session(
+            issued.access_key_id,
+            issued.session_token,
+            account_id=context.account_id,
+            region="eu-west-1",
+        )
+        is SessionAuthResult.OK
+    )
+
+    assert (
+        authenticate_session(issued.access_key_id, "tampered-token", account_id=context.account_id)
+        is SessionAuthResult.TOKEN_MISMATCH
+    )
+    assert (
+        authenticate_session(issued.access_key_id, None, account_id=context.account_id)
+        is SessionAuthResult.TOKEN_MISMATCH
+    )
+    assert (
+        authenticate_session(issued.access_key_id, "", account_id=context.account_id)
+        is SessionAuthResult.TOKEN_MISMATCH
+    )
+    # a mismatch must not consume the session
+    assert resolve_session(issued.access_key_id, account_id=context.account_id) is not None
+
+    assert (
+        authenticate_session("LSISAAAAAAAAAAAAAAAA", "token", account_id=context.account_id)
+        is SessionAuthResult.NOT_REGISTERED
+    )
+    assert authenticate_session("not-a-key", "token") is SessionAuthResult.NOT_REGISTERED
+    assert (
+        authenticate_session(
+            issued.access_key_id, issued.session_token, account_id=other_context.account_id
+        )
+        is SessionAuthResult.NOT_REGISTERED
+    )
+
+    # revocation turns a valid session into a plain unknown key
+    revoked = _issue(context, role_arn)
+    revoke_role_session(revoked.access_key_id)
+    assert (
+        authenticate_session(
+            revoked.access_key_id, revoked.session_token, account_id=context.account_id
+        )
+        is SessionAuthResult.NOT_REGISTERED
+    )
+
+    # expiry prunes the session and reports EXPIRED instead of NOT_REGISTERED
+    expired = _issue(context, role_arn)
+    store = sts_stores[context.account_id][context.region]
+    store.credential_sessions[expired.access_key_id].expiration = datetime.now(UTC) - timedelta(
+        seconds=1
+    )
+    assert (
+        authenticate_session(
+            expired.access_key_id, expired.session_token, account_id=context.account_id
+        )
+        is SessionAuthResult.EXPIRED
+    )
+    assert expired.access_key_id not in store.credential_sessions
+    assert expired.access_key_id not in store.sessions
+    assert (
+        authenticate_session(
+            expired.access_key_id, expired.session_token, account_id=context.account_id
+        )
+        is SessionAuthResult.NOT_REGISTERED
+    )
+
+    # the store holds hashes only, never the presented token or secret
+    session = store.credential_sessions[issued.access_key_id]
+    assert session.session_token_hash != issued.session_token
+    assert not hasattr(session, "session_token")
 
 
 def test_issue_rejects_invalid_inputs_and_missing_role(context):
@@ -253,7 +344,7 @@ def test_assume_role_with_web_identity_full_local_flow(context):
     )
 
     credentials = response["Credentials"]
-    assert credentials["AccessKeyId"].startswith("LSIA")
+    assert credentials["AccessKeyId"].startswith("LSIS")
     assert get_account_id_from_access_key_id(credentials["AccessKeyId"]) == context.account_id
     expected_arn = f"arn:aws:sts::{context.account_id}:assumed-role/web-identity-role/web-session"
     assert response["AssumedRoleUser"]["Arn"] == expected_arn
