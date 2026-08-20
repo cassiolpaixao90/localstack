@@ -4,7 +4,7 @@
 
 Botocore catalog: `1.43.67`
 Botocore model catalog digest: `sha256:f13e7bb3598f143ff1a14b3e0cbe6f8028721fe5ab6d4b980edba7e3904d59cd`
-Capability inventory digest: `sha256:1a44df47d6c1450fd214472599d3d9f96a12edde9ea30a9c8b21fac31eae9a54`
+Capability inventory digest: `sha256:33f47d5064ba09f1df8dc28eee8121c753f56eaa741261358185f2adda098b16`
 Services: **429**
 Operations: **18993**
 Generated interfaces: **37**
@@ -17,8 +17,8 @@ CloudFormation resource types: **129**
 |---|---:|
 | `missing` | 15932 |
 | `scaffold` | 286 |
-| `fallback` | 1939 |
-| `partial` | 836 |
+| `fallback` | 1938 |
+| `partial` | 837 |
 | `native` | 0 |
 | `parity-pass` | 0 |
 
@@ -421,7 +421,7 @@ CloudFormation resource types: **129**
 | sso-oidc | 4 | no | - | - | 4 | 0 | 0 | 0 | 0 | 0 | 0 |
 | stepfunctions | 37 | yes | default | - | 0 | 1 | 0 | 36 | 0 | 0 | 2 |
 | storagegateway | 96 | no | - | - | 96 | 0 | 0 | 0 | 0 | 0 | 0 |
-| sts | 11 | yes | default | moto | 0 | 0 | 11 | 0 | 0 | 0 | 0 |
+| sts | 11 | yes | default | moto | 0 | 0 | 10 | 1 | 0 | 0 | 0 |
 | supplychain | 30 | no | - | - | 30 | 0 | 0 | 0 | 0 | 0 | 0 |
 | support | 16 | yes | default | moto | 0 | 0 | 16 | 0 | 0 | 0 | 0 |
 | support-app | 10 | no | - | - | 10 | 0 | 0 | 0 | 0 | 0 | 0 |
