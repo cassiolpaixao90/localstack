@@ -87,6 +87,12 @@ from localstack.services.cognito_idp.image_validation import (
 from localstack.services.cognito_idp.image_validation import (
     validate_jpeg as validate_jpeg_image,
 )
+from localstack.services.cognito_idp.lambda_triggers import (
+    LambdaTriggerError,
+    TriggerIdentity,
+    invoke_custom_message,
+    parse_lambda_configuration,
+)
 from localstack.services.cognito_idp.list_users_query import (
     ListUsersQueryError,
     ListUsersQueryPager,
@@ -95,15 +101,6 @@ from localstack.services.cognito_idp.log_delivery import (
     CognitoIdpLogDeliveryProvider,
     emit_auth_event,
     emit_notification_error,
-)
-from localstack.services.cognito_idp.lambda_triggers import (
-    LambdaTriggerError,
-    TriggerIdentity,
-    invoke_authentication_trigger,
-    invoke_custom_message,
-    invoke_pre_token_generation,
-    invoke_user_migration,
-    parse_lambda_configuration,
 )
 from localstack.services.cognito_idp.mfa_passwordless import (
     EmailMfaConfiguration,
@@ -4166,7 +4163,14 @@ class CognitoIdpProvider(CognitoIdpLogDeliveryProvider):
     ) -> ServiceResponse:
         _reject_unsupported_fields(
             request,
-            {"ChallengeName", "ChallengeResponses", "ClientId", "ClientMetadata", "Session"},
+            {
+                "ChallengeName",
+                "ChallengeResponses",
+                "ClientId",
+                "ClientMetadata",
+                "Session",
+                "UserContextData",
+            },
         )
         client_metadata = (
             _client_metadata(request["ClientMetadata"]) if "ClientMetadata" in request else None
@@ -4174,6 +4178,8 @@ class CognitoIdpProvider(CognitoIdpLogDeliveryProvider):
         with cognito_idp_stores.lock:
             client, pool = self._find_client(context, request.get("ClientId"))
             pool_id = pool.pool_id
+            # accepted and shape-validated like InitiateAuth; unused without advanced security
+            _runtime_user_context(client, request.get("UserContextData"))
         responses = request.get("ChallengeResponses")
         if not isinstance(responses, dict):
             _error("InvalidParameterException", "ChallengeResponses is required")
@@ -4685,7 +4691,8 @@ class CognitoIdpProvider(CognitoIdpLogDeliveryProvider):
                 _error("CodeMismatchException", "Invalid software token code")
             user.software_token_mfa_secret = encrypted_secret
             user.software_token_mfa_enabled = True
-            user.software_token_mfa_last_step = matched_step
+            # do not consume the step marker here: setup verification must not
+            # block the first sign-in challenge within the same TOTP window
             user.updated_at = _now()
             with cognito_idp_stores.lock:
                 names = FriendlyDeviceNames(
@@ -9132,7 +9139,8 @@ def _device_key(value: Any) -> str:
 
 
 def _optional_auth_device_key(value: Any) -> str | None:
-    if value is None:
+    # SDKs without a registered device send an empty string instead of omitting the field
+    if value is None or value == "":
         return None
     return _device_key(value)
 

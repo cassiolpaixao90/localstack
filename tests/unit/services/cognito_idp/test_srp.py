@@ -318,6 +318,48 @@ def test_temporary_password_completes_new_password_required(provider, context):
     )
 
 
+def test_respond_to_auth_challenge_accepts_bounded_user_context_data(provider, context):
+    pool, client = _stack(provider, context, permanent=False)
+    challenge, private_a = _begin(provider, context, client)
+    password_result = provider.respond_to_auth_challenge(
+        context,
+        _password_verifier_request(pool, client, challenge, private_a, TEMPORARY_PASSWORD),
+    )
+
+    # the Amplify Android SDK sends UserContextData at the top level and an
+    # empty DEVICE_KEY when no device is registered
+    completed = provider.respond_to_auth_challenge(
+        context,
+        {
+            "ChallengeName": "NEW_PASSWORD_REQUIRED",
+            "ChallengeResponses": {
+                "DEVICE_KEY": "",
+                "NEW_PASSWORD": NEW_PASSWORD,
+                "USERNAME": "alice",
+            },
+            "ClientId": client["ClientId"],
+            "Session": password_result["Session"],
+            "UserContextData": {
+                "EncodedData": "android-device-context",
+                "IpAddress": "192.0.2.10",
+            },
+        },
+    )
+    assert completed["AuthenticationResult"]["IdToken"]
+
+    with pytest.raises(CommonServiceException) as error:
+        provider.respond_to_auth_challenge(
+            context,
+            {
+                "ChallengeName": "NEW_PASSWORD_REQUIRED",
+                "ChallengeResponses": {},
+                "ClientId": client["ClientId"],
+                "UserContextData": {"Unexpected": "field"},
+            },
+        )
+    assert error.value.code == "InvalidParameterException"
+
+
 def test_password_verifier_session_is_hash_only_bounded_and_single_use(
     provider, context, monkeypatch
 ):

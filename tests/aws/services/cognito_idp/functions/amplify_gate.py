@@ -16,6 +16,7 @@ def handler(event, _context):
             "id": claims.get("sub"),
             "path": path,
             "role": "trainer",
+            "status": "ok",
             "tenantId": claims.get("custom:tenantId"),
         }
     else:

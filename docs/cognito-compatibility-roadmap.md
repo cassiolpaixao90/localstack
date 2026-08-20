@@ -9,13 +9,14 @@ cleanup, CloudFormation/CDK lifecycle, and client interoperability gates have pa
 The implementation is still under active qualification. Passing unit tests or registering an
 operation in the dispatcher does not complete this program. In particular:
 
-- Amplify v6 direct protocol and Expo Web UI flows have passed against isolated Docker images;
-  the Swift/macOS and Android/Robolectric protocol gates are still qualification work and are not
-  evidence for iOS Simulator, Android emulator, device, or native Authenticator UI support. The
-  Swift gate additionally requires a host that accepts the harness's keychain entitlement
-  signature: macOS 26 kills ad-hoc restricted signatures at launch (amfid error -424), and the
-  Amplify keychain store cannot run without `keychain-access-groups`, so the gate skips on such
-  hosts until a provisioned signing identity is available.
+- Amplify v6 direct protocol and Expo Web UI flows have passed against isolated Docker images,
+  and the Amplify Android 2.39.0 protocol gate passes on a hermetic Robolectric JVM. The
+  Swift/macOS gate is still qualification work: it requires a host that accepts the harness's
+  keychain entitlement signature, because macOS 26 kills ad-hoc restricted signatures at launch
+  (amfid error -424) and the Amplify keychain store cannot run without `keychain-access-groups`,
+  so the gate skips on such hosts until a provisioned signing identity is available. None of
+  these are evidence for iOS Simulator, Android emulator, device, or native Authenticator UI
+  support.
 - WebAuthn cryptography and SDK handlers have unit coverage, and
   `tests/unit/services/cognito_idp/test_webauthn_chrome.py` drives a real Chrome virtual
   authenticator through registration and sign-in over the local TLS/RP-origin boundary on
