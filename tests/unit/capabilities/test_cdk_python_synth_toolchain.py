@@ -309,7 +309,14 @@ def test_offline_venv_uses_pinned_pip_and_closed_flags_as_non_root(tmp_path, mon
         expected_uid=os.geteuid(),
     )
 
-    assert calls[0][0][1:] == ["-I", "-m", "venv", "--without-pip", str(tmp_path / "venv")]
+    assert calls[0][0][1:] == [
+        "-I",
+        "-m",
+        "venv",
+        "--copies",
+        "--without-pip",
+        str(tmp_path / "venv"),
+    ]
     resolve_argv, resolve_options = calls[1]
     assert "--dry-run" in resolve_argv
     assert "--ignore-installed" in resolve_argv

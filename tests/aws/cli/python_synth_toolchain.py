@@ -679,7 +679,10 @@ def create_offline_venv(
     contract = load_contract(origins_path, lock_path)
     wheels = validate_wheelhouse(wheelhouse, contract)
     subprocess.run(
-        [str(base_python), "-I", "-m", "venv", "--without-pip", str(venv_path)],
+        # --copies: the base interpreter on hosted runners can resolve through a
+        # world-writable symlink chain; the venv must own a real, root-chowned copy
+        # so the gate's non-writability check holds.
+        [str(base_python), "-I", "-m", "venv", "--copies", "--without-pip", str(venv_path)],
         check=True,
         timeout=30,
         stdin=subprocess.DEVNULL,
