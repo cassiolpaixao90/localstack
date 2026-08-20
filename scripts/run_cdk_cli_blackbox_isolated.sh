@@ -146,6 +146,9 @@ case "$mode" in
     fi
     if [[ -w "$CDK_PYTHON_SYNTH_PYTHON" || -w "$CDK_PYTHON_SYNTH_TOOLCHAIN_MANIFEST" ]]; then
       echo "the Python synth toolchain remains writable" >&2
+      id >&2
+      ls -lL "$CDK_PYTHON_SYNTH_PYTHON" "$CDK_PYTHON_SYNTH_TOOLCHAIN_MANIFEST" >&2 || true
+      findmnt -n -o TARGET,OPTIONS --target "$CDK_PYTHON_SYNTH_PYTHON" >&2 || true
       exit 1
     fi
     if [[ -w /home/runner/work/_temp/_runner_file_commands ]]; then
