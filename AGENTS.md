@@ -27,6 +27,11 @@ pytest <path/to/test_file.py>                # Run test file
 pytest <path/to/test_file.py> -k <test_name> # Run specific test
 AWS_PROFILE=ls-sandbox TEST_TARGET=AWS_CLOUD SNAPSHOT_UPDATE=1 pytest <path>  # Run against AWS
 
+# CDK gates (see docs/cdk-localstack-enterprise.md)
+npm ci --prefix tests/aws/cli --ignore-scripts --engine-strict  # pinned CDK CLI
+pytest tests/aws/cli/                                           # in-process CDK gates
+bash scripts/run_cdk_docker_gate.sh                             # Docker lifecycle gate
+
 # Code quality
 make lint           # Lint check
 make format         # Format all

@@ -193,6 +193,11 @@ case "$mode" in
     .venv/bin/python -I -S tests/aws/cli/validate_junit.py \
       --scenario deploy-python-apigateway-mock-v1 \
       "$GATE_ROOT/pytest-junit-cdk-apigateway-$RESULT_ARCH.xml"
+    .venv/bin/python -m pytest -q \
+      --junitxml="$GATE_ROOT/pytest-junit-cdk-cognito-lifecycle-$RESULT_ARCH.xml" \
+      tests/aws/cli/test_cdk_cli_cognito_deploy.py
+    .venv/bin/python -I -S tests/aws/cli/validate_junit.py \
+      "$GATE_ROOT/pytest-junit-cdk-cognito-lifecycle-$RESULT_ARCH.xml"
     ;;
   *)
     echo "usage: $0 {enter|run}" >&2

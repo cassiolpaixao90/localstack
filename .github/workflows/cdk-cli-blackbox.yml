@@ -181,6 +181,71 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Archive Cognito lifecycle result
+        if: success() || failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: test-results-cdk-cognito-lifecycle-${{ matrix.arch }}
+          path: target/cdk-cli-blackbox-${{ matrix.arch }}/pytest-junit-cdk-cognito-lifecycle-${{ matrix.arch }}.xml
+          if-no-files-found: error
+          retention-days: 30
+
+  cdk-docker-gate:
+    name: CDK Docker lifecycle gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reject workflow reruns
+        run: test "${{ github.run_attempt }}" = 1
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Set up pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.23.2
+          package-manager-cache: 'false'
+
+      - name: Install Python test dependencies
+        run: make install-test
+
+      - name: Install pinned CDK CLI
+        run: >-
+          npm ci --prefix tests/aws/cli --ignore-scripts --no-audit --no-fund
+          --engine-strict
+
+      - name: Build the LocalStack image
+        run: make docker-build
+
+      - name: Run the CDK Docker lifecycle gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          CDK_DOCKER_GATE_IMAGE="${IMAGE_NAME:-localstack/localstack:latest}" \
+            bash scripts/run_cdk_docker_gate.sh
+
+      - name: Archive Docker gate result
+        if: success() || failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: test-results-cdk-docker-gate
+          path: |
+            target/pytest-junit-cdk-docker-gate-*.xml
+            target/cdk-docker-gate-*.log
+          if-no-files-found: warn
+          retention-days: 30
+
   cdk-cli-blackbox-complete:
     name: CDK CLI Black-box (matrix complete)
     if: always()

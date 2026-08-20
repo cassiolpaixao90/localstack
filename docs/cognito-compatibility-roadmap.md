@@ -130,6 +130,10 @@ A runnable local E2E exercises the HTTP API JWT path end to end against this for
 This fixture is a development convenience; it does not replace the Docker CDK gate
 or the client qualification tracks above.
 
+The layered CDK gate architecture (synth, in-process deploy, Docker lifecycle with
+`scripts/run_cdk_docker_gate.sh`, bootstrap/DefaultStackSynthesizer) and the measured
+restart-persistence boundary are documented in `docs/cdk-localstack-enterprise.md`.
+
 Official contracts used by this program include the AWS Cognito User Pools and Federated
 Identities API references, the CloudFormation Cognito resource reference, and current Amplify
 Auth documentation. Repository tests remain the executable source of truth.
