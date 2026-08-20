@@ -47,6 +47,12 @@ case "$mode" in
     mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /tmp
     ip link set lo up
 
+    echo "gate network namespace interfaces:" >&2
+    ip -o link show >&2
+    echo "gate network namespace routes:" >&2
+    ip -4 route show >&2
+    ip -6 route show >&2
+
     readonly synth_wheelhouse="$sandbox_workspace/target/cdk-python-synth-wheelhouse-$result_arch"
     readonly synth_venv="$sandbox_gate_root/cdk-python-synth-venv"
     readonly synth_manifest="$sandbox_gate_root/cdk-python-synth-toolchain-$result_arch.json"
